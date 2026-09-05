@@ -186,6 +186,7 @@ function buildList(nodes, color){
 const EMBEDS = {
   'settings-generator': 'generator.html',
   'css-generator': 'css-generator.html',
+  'css-official': 'official-css.html',
   'crosshair-maker': 'crosshair-maker.html',
   'scripts-krunkscript-generator': 'ks-generator.html',
   'scripts-krunkscript-docs-kr': 'kr-docs/index.html',
