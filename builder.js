@@ -504,7 +504,7 @@ const POST_LINKS = {
   'crosshair-scope': 'community/image-section.html?cat=crosshair-scope&title=Scope',
   'crosshair-hitmarker': 'community/image-section.html?cat=crosshair-hitmarker&title=Hitmarker',
   'settings-ready': 'community/section.html?cat=settings-ready&title=Ready%20Settings&filetype=txt',
-  'css-ready': 'community/section.html?cat=css-ready&title=Ready%20CSS',
+  'css-ready': 'community/css-post.html',
   'maps-official-infected': 'community/section.html?cat=maps-official-infected&title=Infected',
   'maps-official-tdm': 'community/section.html?cat=maps-official-tdm&title=TDM',
   'maps-custom-parkour': 'community/section.html?cat=maps-custom-parkour&title=Parkour',
@@ -524,6 +524,12 @@ const GALLERY_SECTIONS = {
    documents like .txt, not images) directly on the placeholder page. */
 const FILE_GALLERY_SECTIONS = {
   'settings-ready': { cat: 'settings-ready', title: 'Community Ready Settings', ext: 'txt' },
+};
+
+/* Leaf nodes that post Name + multiple preview screenshots + a single
+   .txt/.css file (content is JSON: {file_url, file_name, previews[]}). */
+const CSS_GALLERY_SECTIONS = {
+  'css-ready': { cat: 'css-ready', title: 'Community Ready CSS' },
 };
 
 function renderContent(){
@@ -607,6 +613,12 @@ function renderContent(){
         <div class="file-gallery" id="fileGallery"><div class="gallery-empty">Loading...</div></div>
       </div>
     ` : ''}
+    ${CSS_GALLERY_SECTIONS[node.id] ? `
+      <div class="gallery-wrap">
+        <h3 class="gallery-heading">${CSS_GALLERY_SECTIONS[node.id].title || 'Community Posts'}</h3>
+        <div class="crosshair-gallery" id="cssGallery"><div class="gallery-empty">Loading...</div></div>
+      </div>
+    ` : ''}
   `;
 
   if(POST_LINKS[node.id]){
@@ -622,6 +634,10 @@ function renderContent(){
 
   if(FILE_GALLERY_SECTIONS[node.id]){
     loadFileGallery(FILE_GALLERY_SECTIONS[node.id].cat);
+  }
+
+  if(CSS_GALLERY_SECTIONS[node.id]){
+    loadCssGallery();
   }
 
   el.querySelectorAll('.child-card').forEach(card => {
@@ -793,6 +809,81 @@ async function loadFileGallery(cat){
         const { error } = await sb.from('posts').delete().eq('id', id);
         if(error){ alert('Failed to delete: ' + error.message); return; }
         loadFileGallery(cat);
+      });
+    });
+  } catch(e) {
+    if(container) container.innerHTML = `<div class="gallery-empty">Failed to load gallery.</div>`;
+  }
+}
+
+async function loadCssGallery(){
+  const container = document.getElementById('cssGallery');
+  if(!container || typeof sb === 'undefined') return;
+  const cat = 'css-ready';
+
+  try {
+    const currentUser = typeof getSessionUser === 'function' ? await getSessionUser() : null;
+
+    const { data, error } = await sb
+      .from('posts')
+      .select('*, profiles!posts_author_id_fkey(username,display_name,avatar_url)')
+      .eq('status', 'published')
+      .eq('category', cat)
+      .order('created_at', { ascending: false })
+      .limit(24);
+
+    if(error){ container.innerHTML = `<div class="gallery-empty">Failed to load: ${escapeHtml(error.message)}</div>`; return; }
+    if(!data.length){ container.innerHTML = `<div class="gallery-empty">Nothing posted here yet. Be the first!</div>`; return; }
+    if(document.getElementById('cssGallery') !== container) return; /* navigated away */
+
+    container.innerHTML = data.map(p => {
+      let parsed = null;
+      try { parsed = JSON.parse(p.content); } catch(e) { /* legacy/plain content */ }
+      const previews = parsed?.previews || [];
+      const fileUrl = parsed?.file_url || (parsed ? null : p.content);
+      const fileName = parsed?.file_name || (p.title || 'file') + '.txt';
+      const isOwner = currentUser && p.author_id === currentUser.id;
+
+      const previewHtml = previews.length
+        ? `<img class="gallery-canvas" src="${previews[0]}" alt="${escapeHtml(p.title)}">`
+        : `<div class="gallery-canvas" style="display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:24px;">📄</div>`;
+
+      return `
+      <div class="gallery-card">
+        ${previewHtml}
+        ${previews.length > 1 ? `<div class="gallery-meta">+${previews.length - 1} more preview${previews.length - 1 > 1 ? 's' : ''}</div>` : ''}
+        <div class="gallery-title">${escapeHtml(p.title)}</div>
+        <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
+        <div class="gallery-actions">
+          ${fileUrl ? `<a class="gallery-btn" href="${fileUrl}" download="${fileName}">Download</a>` : ''}
+          ${isOwner ? `
+            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}">Edit</button>
+            <button class="gallery-btn" data-action="delete" data-id="${p.id}">Delete</button>
+          ` : ''}
+        </div>
+      </div>
+    `;
+    }).join('');
+
+    container.querySelectorAll('[data-action="edit"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.getAttribute('data-id');
+        const currentTitle = btn.getAttribute('data-title');
+        const newTitle = prompt('Edit name:', currentTitle);
+        if(newTitle === null || !newTitle.trim() || newTitle.trim() === currentTitle) return;
+        const { error } = await sb.from('posts').update({ title: newTitle.trim() }).eq('id', id);
+        if(error){ alert('Failed to update: ' + error.message); return; }
+        loadCssGallery();
+      });
+    });
+
+    container.querySelectorAll('[data-action="delete"]').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if(!confirm('Delete this post? This cannot be undone.')) return;
+        const id = btn.getAttribute('data-id');
+        const { error } = await sb.from('posts').delete().eq('id', id);
+        if(error){ alert('Failed to delete: ' + error.message); return; }
+        loadCssGallery();
       });
     });
   } catch(e) {
