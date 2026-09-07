@@ -160,7 +160,7 @@ for each row execute function public.set_updated_at();
 -- 1. Developer PERTAMA harus di-set manual lewat SQL Editor, contoh:
 --      update public.profiles set role = 'developer' where username = 'USERNAME_KAMU';
 --    Jalankan ini SETELAH kamu daftar akun pertama kali lewat website.
---    (Lihat juga sql/set_developer.sql — sudah disiapkan untuk akun KNLVX.)
+--    (Lihat juga sql/set_developer.sql — sudah disiapkan untuk akun knlvx_aura.)
 --
 -- 2. Setelah itu, Developer bisa angkat/turunin Admin lewat halaman
 --    /community/developer.html (tidak perlu SQL lagi).
