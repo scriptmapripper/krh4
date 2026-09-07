@@ -1,6 +1,8 @@
 -- =========================================================
 --  Krunker Resource Hub — Account / Role / Post system
 --  Jalankan seluruh file ini di Supabase Dashboard > SQL Editor
+--  Versi RERUNNABLE — aman dijalankan berkali-kali, gak akan
+--  error "already exists" walaupun tabel/policy udah ada.
 -- =========================================================
 
 -- ---------- 1. Table: profiles ----------
@@ -23,16 +25,19 @@ alter table public.profiles enable row level security;
 
 -- Semua orang (termasuk yang belum login) boleh lihat profil dasar
 -- (dibutuhkan supaya nama penulis post bisa ditampilkan di feed publik)
+drop policy if exists "profiles_public_read" on public.profiles;
 create policy "profiles_public_read"
 on public.profiles for select
 using (true);
 
 -- User cuma boleh bikin profil untuk dirinya sendiri, role wajib 'user'
+drop policy if exists "profiles_insert_self" on public.profiles;
 create policy "profiles_insert_self"
 on public.profiles for insert
 with check (auth.uid() = id and role = 'user');
 
 -- User boleh update profil sendiri, TAPI TIDAK BOLEH ganti role-nya sendiri
+drop policy if exists "profiles_update_self" on public.profiles;
 create policy "profiles_update_self"
 on public.profiles for update
 using (auth.uid() = id)
@@ -42,6 +47,7 @@ with check (
 );
 
 -- Developer boleh update profil siapa saja (termasuk ganti role -> admin/dev)
+drop policy if exists "profiles_update_by_developer" on public.profiles;
 create policy "profiles_update_by_developer"
 on public.profiles for update
 using (
@@ -79,16 +85,19 @@ create table if not exists public.posts (
 alter table public.posts enable row level security;
 
 -- Post published boleh dibaca siapa saja (termasuk yang belum login)
+drop policy if exists "posts_public_read_published" on public.posts;
 create policy "posts_public_read_published"
 on public.posts for select
 using (status = 'published');
 
 -- Penulis boleh baca post draft miliknya sendiri
+drop policy if exists "posts_owner_read_own" on public.posts;
 create policy "posts_owner_read_own"
 on public.posts for select
 using (auth.uid() = author_id);
 
 -- Admin & developer boleh baca SEMUA post (termasuk draft orang lain)
+drop policy if exists "posts_staff_read_all" on public.posts;
 create policy "posts_staff_read_all"
 on public.posts for select
 using (
@@ -97,17 +106,20 @@ using (
 
 -- Cuma user yang sudah login & sudah punya profil yang boleh bikin post,
 -- dan author_id wajib dirinya sendiri
+drop policy if exists "posts_insert_own" on public.posts;
 create policy "posts_insert_own"
 on public.posts for insert
 with check (auth.uid() = author_id);
 
 -- Penulis boleh edit post-nya sendiri
+drop policy if exists "posts_update_own" on public.posts;
 create policy "posts_update_own"
 on public.posts for update
 using (auth.uid() = author_id)
 with check (auth.uid() = author_id);
 
 -- Admin & developer boleh edit (mis. publish/unpublish) post siapa saja
+drop policy if exists "posts_update_staff" on public.posts;
 create policy "posts_update_staff"
 on public.posts for update
 using (
@@ -115,11 +127,13 @@ using (
 );
 
 -- Penulis boleh hapus post-nya sendiri
+drop policy if exists "posts_delete_own" on public.posts;
 create policy "posts_delete_own"
 on public.posts for delete
 using (auth.uid() = author_id);
 
 -- Admin & developer boleh hapus post siapa saja
+drop policy if exists "posts_delete_staff" on public.posts;
 create policy "posts_delete_staff"
 on public.posts for delete
 using (
@@ -146,6 +160,7 @@ for each row execute function public.set_updated_at();
 -- 1. Developer PERTAMA harus di-set manual lewat SQL Editor, contoh:
 --      update public.profiles set role = 'developer' where username = 'USERNAME_KAMU';
 --    Jalankan ini SETELAH kamu daftar akun pertama kali lewat website.
+--    (Lihat juga sql/set_developer.sql — sudah disiapkan untuk akun KNLVX.)
 --
 -- 2. Setelah itu, Developer bisa angkat/turunin Admin lewat halaman
 --    /community/developer.html (tidak perlu SQL lagi).
