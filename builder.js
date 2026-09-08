@@ -505,9 +505,9 @@ const POST_LINKS = {
   'crosshair-hitmarker': 'community/image-section.html?cat=crosshair-hitmarker&title=Hitmarker',
   'settings-ready': 'community/section.html?cat=settings-ready&title=Ready%20Settings&filetype=txt',
   'css-ready': 'community/css-post.html',
-  'maps-official-infected': 'community/section.html?cat=maps-official-infected&title=Infected',
-  'maps-official-tdm': 'community/section.html?cat=maps-official-tdm&title=TDM',
-  'maps-custom-parkour': 'community/section.html?cat=maps-custom-parkour&title=Parkour',
+  'maps-official-infected': 'community/section.html?cat=maps-official-infected&title=Infected&filetype=txt,js',
+  'maps-official-tdm': 'community/section.html?cat=maps-official-tdm&title=TDM&filetype=txt,js',
+  'maps-custom-parkour': 'community/section.html?cat=maps-custom-parkour&title=Parkour&filetype=txt,js',
   'mods-files': 'community/section.html?cat=mods-files&title=Mods%20Files',
   'scripts-userscript-hack': 'community/section.html?cat=scripts-userscript-hack&title=Hack%20Script',
 };
@@ -524,6 +524,9 @@ const GALLERY_SECTIONS = {
    documents like .txt, not images) directly on the placeholder page. */
 const FILE_GALLERY_SECTIONS = {
   'settings-ready': { cat: 'settings-ready', title: 'Community Ready Settings', ext: 'txt' },
+  'maps-official-infected': { cat: 'maps-official-infected', title: 'Community Infected Maps', ext: 'txt,js' },
+  'maps-official-tdm': { cat: 'maps-official-tdm', title: 'Community TDM Maps', ext: 'txt,js' },
+  'maps-custom-parkour': { cat: 'maps-custom-parkour', title: 'Community Parkour Maps', ext: 'txt,js' },
 };
 
 /* Leaf nodes that post Name + multiple preview screenshots + a single
@@ -771,7 +774,10 @@ async function loadFileGallery(cat){
 
     container.innerHTML = data.map(p => {
       const isOwner = currentUser && p.author_id === currentUser.id;
-      const filename = (p.title || 'file').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
+      const urlExt = (p.content || '').split('.').pop().split(/[?#]/)[0];
+      const safeExt = /^[a-z0-9]{1,8}$/i.test(urlExt) ? urlExt.toLowerCase() : '';
+      const baseName = (p.title || 'file').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
+      const filename = safeExt ? `${baseName}.${safeExt}` : baseName;
       return `
       <div class="file-card">
         <div class="file-icon">📄</div>

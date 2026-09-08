@@ -57,7 +57,10 @@ let pendingFile = null;
 const params = new URLSearchParams(window.location.search);
 const CAT = params.get("cat") || "crosshair";
 const TITLE = params.get("title") || "Posts";
-const FILETYPE = params.get("filetype") || null; /* e.g. "txt" — switches to file-upload mode */
+const FILETYPE_RAW = params.get("filetype") || null; /* e.g. "txt" or "txt,js" — switches to file-upload mode */
+/* List of allowed extensions, lowercase, no leading dot. e.g. ["txt","js"] */
+const FILETYPES = FILETYPE_RAW ? FILETYPE_RAW.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : [];
+const FILETYPE = FILETYPES[0] || null; /* kept for anything that only needs a single default extension */
 
 document.title = TITLE + " — Krunker Resource Hub";
 document.getElementById("pageTitle").textContent = TITLE;
@@ -65,20 +68,33 @@ document.getElementById("pageSubtitle").textContent = `Community submissions fil
 document.getElementById("submitHeading").textContent = `Post Your ${TITLE}`;
 document.getElementById("feedHeading").textContent = `All ${TITLE} Posts`;
 
-if (FILETYPE) {
+if (FILETYPES.length) {
   document.getElementById("pContent").style.display = "none";
-  document.getElementById("contentLabel").textContent = `${TITLE} File (.${FILETYPE})`;
+  const extLabel = FILETYPES.map(ext => "." + ext).join(" or ");
+  document.getElementById("contentLabel").textContent = `${TITLE} File (${extLabel})`;
   const fileInput = document.getElementById("pFile");
   fileInput.style.display = "block";
-  fileInput.accept = "." + FILETYPE;
+  fileInput.accept = FILETYPES.map(ext => "." + ext).join(",");
   /* The gallery for this category now lives on the main placeholder page,
      so hide the inline feed card entirely to avoid duplicating it here. */
   document.getElementById("feedCard").style.display = "none";
 }
 
 document.getElementById("pFile")?.addEventListener("change", (e) => {
+  const msg = document.getElementById("createMsg");
   const file = e.target.files[0];
   if (!file) return;
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  if (FILETYPES.length && !FILETYPES.includes(ext)) {
+    const extLabel = FILETYPES.map(x => "." + x).join(" or ");
+    msg.className = "msg error show";
+    msg.textContent = `Only ${extLabel} files are allowed.`;
+    e.target.value = "";
+    pendingFile = null;
+    document.getElementById("pPreviewWrap").style.display = "none";
+    return;
+  }
+  msg.className = ""; msg.textContent = "";
   pendingFile = file;
   document.getElementById("pFileName").textContent = `Selected: ${file.name}`;
   document.getElementById("pPreviewWrap").style.display = "block";
@@ -108,15 +124,21 @@ document.getElementById("btnPublish")?.addEventListener("click", async () => {
   const msg = document.getElementById("createMsg");
   const title = document.getElementById("pTitle").value.trim();
 
-  if (FILETYPE) {
+  if (FILETYPES.length) {
+    const extLabel = FILETYPES.map(x => "." + x).join(" or ");
     if (!title || !pendingFile) {
-      msg.className = "msg error show"; msg.textContent = `Title & a .${FILETYPE} file are required.`;
+      msg.className = "msg error show"; msg.textContent = `Title & a ${extLabel} file are required.`;
+      return;
+    }
+    const fileExt = (pendingFile.name.split(".").pop() || "").toLowerCase();
+    if (!FILETYPES.includes(fileExt)) {
+      msg.className = "msg error show"; msg.textContent = `Only ${extLabel} files are allowed.`;
       return;
     }
     const btn = document.getElementById("btnPublish");
     btn.disabled = true; btn.textContent = "Publishing...";
 
-    const path = `${me.id}/${CAT}-${Date.now()}.${FILETYPE}`;
+    const path = `${me.id}/${CAT}-${Date.now()}.${fileExt}`;
     const { error: uploadError } = await sb.storage
       .from("post-files")
       .upload(path, pendingFile, { upsert: true, cacheControl: "3600" });
