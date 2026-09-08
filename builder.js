@@ -18,6 +18,33 @@ const ICONS = {
 };
 function icon(key){ return ICONS[key] || ''; }
 
+/* Cross-origin files (e.g. Supabase Storage) ignore the <a download="..."> filename hint —
+   browsers only honor it for same-origin links. So for real remote file downloads we fetch
+   the file as a blob and trigger the download from a same-origin blob: URL instead, which
+   always respects our chosen filename. */
+async function downloadFileByUrl(url, filename, btn){
+  const originalText = btn ? btn.textContent : null;
+  if(btn){ btn.disabled = true; btn.textContent = 'Downloading...'; }
+  try {
+    const res = await fetch(url);
+    if(!res.ok) throw new Error('Download failed (' + res.status + ')');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+  } catch(e) {
+    alert('Could not download the file automatically. Opening it in a new tab instead — use "Save As" there.');
+    window.open(url, '_blank', 'noopener');
+  } finally {
+    if(btn){ btn.disabled = false; btn.textContent = originalText; }
+  }
+}
+
 /* ---------------- data model (from mindmap) ---------------- */
 const DATA = [
   { id:'home', label:'Home', color:'blue', glyph:'home',
@@ -686,7 +713,7 @@ async function loadCrosshairGallery(cat){
         <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
         <div class="gallery-actions">
           ${isImage
-            ? `<a class="gallery-btn" href="${p.content}" download="${(p.title || 'crosshair').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase()}.png">Download PNG</a>`
+            ? `<button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(p.content)}" data-filename="${encodeURIComponent((p.title || 'crosshair').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase() + '.png')}">Download PNG</button>`
             : `<button class="gallery-btn" data-action="download" data-code="${encodeURIComponent(p.content)}" data-name="${escapeHtml(p.title)}">Download PNG</button>`}
           ${isOwner ? `
             <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}">Edit</button>
@@ -713,6 +740,13 @@ async function loadCrosshairGallery(cat){
       }
     });
 
+    container.querySelectorAll('[data-action="download-remote"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = decodeURIComponent(btn.getAttribute('data-url'));
+        const filename = decodeURIComponent(btn.getAttribute('data-filename'));
+        downloadFileByUrl(url, filename, btn);
+      });
+    });
     container.querySelectorAll('[data-action="download"]').forEach(btn => {
       btn.addEventListener('click', () => {
         const code = decodeURIComponent(btn.getAttribute('data-code'));
@@ -802,7 +836,7 @@ async function loadFileGallery(cat){
         </div>
         <div class="gallery-actions">
           ${isJsonContent ? `<button class="gallery-btn" data-action="toggle-desc" data-id="${p.id}">Description</button>` : ''}
-          <a class="gallery-btn" href="${fileUrl}" download="${filename}" target="_blank" rel="noopener">Download</a>
+          <button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(fileUrl)}" data-filename="${encodeURIComponent(filename)}">Download</button>
           ${isOwner ? `
             <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}" data-desc="${encodeURIComponent(description)}" data-isjson="${isJsonContent ? '1' : '0'}" data-fileurl="${encodeURIComponent(fileUrl)}" data-filename="${encodeURIComponent(fileName)}">Edit</button>
             <button class="gallery-btn" data-action="delete" data-id="${p.id}">Delete</button>
@@ -811,6 +845,14 @@ async function loadFileGallery(cat){
       </div>
     `;
     }).join('');
+
+    container.querySelectorAll('[data-action="download-remote"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = decodeURIComponent(btn.getAttribute('data-url'));
+        const filename = decodeURIComponent(btn.getAttribute('data-filename'));
+        downloadFileByUrl(url, filename, btn);
+      });
+    });
 
     container.querySelectorAll('[data-action="toggle-desc"]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -904,7 +946,7 @@ async function loadCssGallery(){
         <div class="gallery-title">${escapeHtml(p.title)}</div>
         <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
         <div class="gallery-actions">
-          ${fileUrl ? `<a class="gallery-btn" href="${fileUrl}" download="${fileName}">Download</a>` : ''}
+          ${fileUrl ? `<button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(fileUrl)}" data-filename="${encodeURIComponent(fileName)}">Download</button>` : ''}
           ${isOwner ? `
             <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}">Edit</button>
             <button class="gallery-btn" data-action="delete" data-id="${p.id}">Delete</button>
@@ -913,6 +955,14 @@ async function loadCssGallery(){
       </div>
     `;
     }).join('');
+
+    container.querySelectorAll('[data-action="download-remote"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const url = decodeURIComponent(btn.getAttribute('data-url'));
+        const filename = decodeURIComponent(btn.getAttribute('data-filename'));
+        downloadFileByUrl(url, filename, btn);
+      });
+    });
 
     container.querySelectorAll('[data-action="edit"]').forEach(btn => {
       btn.addEventListener('click', async () => {
