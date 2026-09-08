@@ -242,6 +242,21 @@ ul.tree ul.tree{margin-left:16px; border-left:1px dashed var(--border-strong); p
 .gallery-title{ font-family:'Rajdhani',sans-serif; font-weight:700; font-size:14.5px; color:var(--text-0); }
 .gallery-meta{ font-size:12px; color:var(--text-2); }
 .gallery-desc{ font-size:13px; color:var(--text-2); margin-top:6px; line-height:1.5; white-space:pre-wrap; }
+.video-guide-grid{
+  display:grid; grid-template-columns:repeat(auto-fill, minmax(260px,1fr)); gap:18px; margin-top:22px;
+}
+.video-guide-card{
+  border:1px solid var(--border); border-radius:14px; overflow:hidden;
+  background:rgba(255,255,255,.02); text-decoration:none; display:flex; flex-direction:column;
+  transition:.15s ease;
+}
+.video-guide-card:hover{ transform:translateY(-2px); border-color:var(--border-strong); }
+.video-guide-thumb{ width:100%; aspect-ratio:16/9; object-fit:cover; background:#05070f; display:block; }
+.video-guide-info{ padding:12px 14px 16px; }
+.video-guide-title{
+  font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px; color:var(--text-0); margin-bottom:6px;
+}
+.video-guide-summary{ font-size:13px; color:var(--text-2); line-height:1.5; }
 .gallery-actions{ display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; justify-content:center; }
 .gallery-btn{
   font-family:'Rajdhani',sans-serif; font-size:12px; font-weight:600; padding:6px 10px;

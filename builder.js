@@ -66,6 +66,7 @@ const DATA = [
 
   { id:'css', label:'CSS', color:'green', glyph:'braces',
     children:[
+      { id:'css-setup-guide', label:'CSS Setup Guide' },
       { id:'css-generator', label:'CSS Generator' },
       { id:'css-official', label:'Official / Original CSS' },
       { id:'css-ready', label:'Ready CSS' },
@@ -524,6 +525,58 @@ function renderLinkPage(node, main, crumbs){
   `;
 }
 
+/* Leaf nodes that show a curated list of YouTube video guides with
+   thumbnail, title, and a short written summary of the video. */
+const VIDEO_GUIDE_SECTIONS = {
+  'css-setup-guide': {
+    intro: 'Video tutorial buat setup & pasang CSS di Krunker.',
+    videos: [
+      {
+        id: 'b82BEE-1psg',
+        url: 'https://youtu.be/b82BEE-1psg',
+        title: 'Krunker CSS, Mods & UserScripts — Complete Beginner\u2019s Guide',
+        summary: 'Covers the basics: CSS restyles Krunker\u2019s UI, mods swap out visual/audio assets like textures, sounds, and models, and userscripts are JavaScript code that can change how the game behaves \u2014 powerful, but risky if you install the wrong one. Shows where to find community CSS, mods, and userscripts (the Krunker Design Hub Discord and a public CSS site), then walks through installing CSS and userscripts via the Resource Swapper folder, plus how to build a mod manually by dropping texture/sound/model files into swapper subfolders.',
+      },
+      {
+        id: 'dDiSRh3f7wU',
+        url: 'https://youtu.be/dDiSRh3f7wU',
+        title: 'Krunker CSS, Mods & UserScripts — Complete Beginner\u2019s Guide',
+        summary: 'Covers the basics: CSS restyles Krunker\u2019s UI, mods swap out visual/audio assets like textures, sounds, and models, and userscripts are JavaScript code that can change how the game behaves \u2014 powerful, but risky if you install the wrong one. Shows where to find community CSS, mods, and userscripts (the Krunker Design Hub Discord and a public CSS site), then walks through installing CSS and userscripts via the Resource Swapper folder, plus how to build a mod manually by dropping texture/sound/model files into swapper subfolders.',
+      },
+      {
+        id: 'XdWRIjCArgU',
+        url: 'https://youtu.be/XdWRIjCArgU',
+        title: 'Krunker CSS, Mods & UserScripts — Complete Beginner\u2019s Guide',
+        summary: 'Covers the basics: CSS restyles Krunker\u2019s UI, mods swap out visual/audio assets like textures, sounds, and models, and userscripts are JavaScript code that can change how the game behaves \u2014 powerful, but risky if you install the wrong one. Shows where to find community CSS, mods, and userscripts (the Krunker Design Hub Discord and a public CSS site), then walks through installing CSS and userscripts via the Resource Swapper folder, plus how to build a mod manually by dropping texture/sound/model files into swapper subfolders.',
+      },
+    ],
+  },
+};
+
+function renderVideoGuide(node, main, crumbs){
+  const section = VIDEO_GUIDE_SECTIONS[node.id];
+  const el = document.getElementById('content');
+  el.innerHTML = `
+    <div class="breadcrumb">${crumbs}</div>
+    <div class="content-head">
+      <div class="content-icon">${icon(main.glyph)}</div>
+      <h2>${node.label}</h2>
+    </div>
+    <p class="content-desc">${escapeHtml(section.intro)}</p>
+    <div class="video-guide-grid">
+      ${section.videos.map(v => `
+        <a class="video-guide-card" href="${v.url}" target="_blank" rel="noopener">
+          <img class="video-guide-thumb" src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="${escapeHtml(v.title)}" loading="lazy">
+          <div class="video-guide-info">
+            <div class="video-guide-title">${escapeHtml(v.title)}</div>
+            <div class="video-guide-summary">${escapeHtml(v.summary)}</div>
+          </div>
+        </a>
+      `).join('')}
+    </div>
+  `;
+}
+
 /* Leaf nodes that stay as a plain placeholder by default, but offer a
    "Create Post" button that loads the real community post page on demand. */
 const POST_LINKS = {
@@ -611,6 +664,11 @@ function renderContent(){
 
   if(LINK_PAGES[node.id]){
     renderLinkPage(node, main, crumbs);
+    return;
+  }
+
+  if(VIDEO_GUIDE_SECTIONS[node.id]){
+    renderVideoGuide(node, main, crumbs);
     return;
   }
 
