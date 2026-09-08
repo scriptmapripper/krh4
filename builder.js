@@ -15,6 +15,9 @@ const ICONS = {
   clients: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8.5" r="3"/><path d="M3.5 20c0-3 2.5-5.2 5.5-5.2S14.5 17 14.5 20"/><circle cx="17" cy="9.5" r="2.4"/><path d="M14.8 15c2.7.3 4.7 2.3 4.7 5"/></svg>',
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><line x1="12" y1="11" x2="12" y2="16.5"/><circle cx="12" cy="7.8" r="1" fill="currentColor" stroke="none"/></svg>',
   server: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="6" rx="1.4"/><rect x="3.5" y="14" width="17" height="6" rx="1.4"/><circle cx="7" cy="7" r=".9" fill="currentColor" stroke="none"/><circle cx="7" cy="17" r=".9" fill="currentColor" stroke="none"/></svg>',
+  github: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.5a9.5 9.5 0 0 0-3 18.5c.5.1.65-.2.65-.45v-1.7c-2.65.55-3.2-1.2-3.2-1.2-.45-1.1-1.05-1.4-1.05-1.4-.85-.55.05-.55.05-.55.95.05 1.45.95 1.45.95.85 1.4 2.2 1 2.75.75.1-.6.35-1 .6-1.25-2.1-.25-4.35-1.05-4.35-4.65 0-1.05.35-1.85.95-2.55-.1-.25-.4-1.25.1-2.55 0 0 .8-.25 2.6.95a9 9 0 0 1 4.75 0c1.8-1.2 2.6-.95 2.6-.95.5 1.3.2 2.3.1 2.55.6.7.95 1.5.95 2.55 0 3.6-2.25 4.4-4.35 4.65.35.3.65.9.65 1.8v2.65c0 .25.15.55.65.45A9.5 9.5 0 0 0 12 2.5Z"/></svg>',
+  download: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v12"/><polyline points="7 11 12 16 17 11"/><path d="M4.5 17v2.2A1.3 1.3 0 0 0 5.8 20.5h12.4a1.3 1.3 0 0 0 1.3-1.3V17"/></svg>',
+  sparkles: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M11 3.5 12.3 8l4.5 1.3L12.3 10.6 11 15.1 9.7 10.6 5.2 9.3 9.7 8Z"/><path d="M18 14.5 18.7 17l2.5.7-2.5.7L18 21l-.7-2.6-2.5-.7 2.5-.7Z"/></svg>',
 };
 function icon(key){ return ICONS[key] || ''; }
 
@@ -553,6 +556,22 @@ const VIDEO_GUIDE_SECTIONS = {
   },
 };
 
+function videoGuideCardsHtml(videos){
+  return `
+    <div class="video-guide-grid">
+      ${videos.map(v => `
+        <a class="video-guide-card" href="${v.url}" target="_blank" rel="noopener">
+          <img class="video-guide-thumb" src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="${escapeHtml(v.title)}" loading="lazy">
+          <div class="video-guide-info">
+            <div class="video-guide-title">${escapeHtml(v.title)}</div>
+            <div class="video-guide-summary">${escapeHtml(v.summary)}</div>
+          </div>
+        </a>
+      `).join('')}
+    </div>
+  `;
+}
+
 function renderVideoGuide(node, main, crumbs){
   const section = VIDEO_GUIDE_SECTIONS[node.id];
   const el = document.getElementById('content');
@@ -563,17 +582,173 @@ function renderVideoGuide(node, main, crumbs){
       <h2>${node.label}</h2>
     </div>
     <p class="content-desc">${escapeHtml(section.intro)}</p>
-    <div class="video-guide-grid">
-      ${section.videos.map(v => `
-        <a class="video-guide-card" href="${v.url}" target="_blank" rel="noopener">
-          <img class="video-guide-thumb" src="https://i.ytimg.com/vi/${v.id}/hqdefault.jpg" alt="${escapeHtml(v.title)}" loading="lazy">
-          <div class="video-guide-info">
-            <div class="video-guide-title">${escapeHtml(v.title)}</div>
-            <div class="video-guide-summary">${escapeHtml(v.summary)}</div>
+    ${videoGuideCardsHtml(section.videos)}
+  `;
+}
+
+/* Dedicated content for the Mods > Modding Guide page: what a mod is, how to
+   build one manually via the Resource Swapper, video walkthroughs, useful
+   community resources, and the weapon_X naming/multiplier reference tables. */
+const MODS_GUIDE_CONTENT = {
+  intro: 'A mod doesn\u2019t change how Krunker\u2019s code works \u2014 it swaps out the assets that code uses, like textures, sounds, and 3D models. You can upload a finished mod straight to Krunker, but you can also build and test one locally first (handy for works-in-progress, or if you\u2019d rather not clutter Krunker\u2019s public mod list) using the Resource Swapper.',
+  steps: [
+    'Open your Krunker client, then go to Settings \u2192 Client \u2192 Resource Swapper, and open that folder.',
+    'Inside it, create a new folder named after the asset type you\u2019re replacing \u2014 for example "textures", "sound" (no trailing "s"), or "models".',
+    'Drop your replacement texture, sound, or model files into that folder, matching Krunker\u2019s original file names (see the weapon reference tables below for weapon file names).',
+    'In your Resource Swapper settings, make sure "Autoload Mod" is turned off \u2014 otherwise Krunker will keep loading your last uploaded mod instead of these local files.',
+    'Restart your Krunker client so it picks up the new files.',
+  ],
+  videos: [
+    {
+      id: 'b82BEE-1psg',
+      url: 'https://youtu.be/b82BEE-1psg',
+      title: 'Krunker CSS, Mods & UserScripts — Complete Beginner\u2019s Guide',
+      summary: 'Covers the basics: CSS restyles Krunker\u2019s UI, mods swap out visual/audio assets like textures, sounds, and models, and userscripts are JavaScript code that can change how the game behaves \u2014 powerful, but risky if you install the wrong one. Also walks through building a mod manually via the Resource Swapper, dropping texture/sound/model files into swapper subfolders.',
+    },
+    {
+      id: 'febRLmORZyw',
+      url: 'https://www.youtube.com/watch?v=febRLmORZyw&t=312s',
+      title: 'How to Dye Krunker Mods (Tutorial)',
+      summary: 'Tutorial on dyeing (recoloring) Krunker weapon mods \u2014 linked to start at the relevant section (5:12).',
+    },
+  ],
+  resources: [
+    {
+      title: 'KEA \u2014 Krunker Expanded Assets',
+      desc: 'Community asset repo for modding \u2014 use it alongside the weapon reference tables below.',
+      url: 'https://github.com/KrunkerDesignHub/KEA-Krunker_Expanded_Assets',
+      icon: 'github',
+    },
+    {
+      title: 'Krunker Mod ZIP',
+      desc: 'Download all of Krunker\u2019s original mod assets in one ZIP \u2014 useful as a base to edit from.',
+      url: 'https://krunker.io/modzip/',
+      icon: 'download',
+    },
+    {
+      title: 'Krunker Shader Maker',
+      desc: 'Build custom shaders for Krunker \u2014 also part of the modding toolkit.',
+      url: 'https://hitthemoney.com/krunker-shader-maker/',
+      icon: 'sparkles',
+    },
+  ],
+  tables: [
+    {
+      title: 'Weapon Multiplier (Dye Setup in Blender)',
+      note: 'The x-value is the color/dye multiplier to use when setting a weapon up in Blender.',
+      headers: ['Weapon File(s)', 'Weapon', 'Multiplier'],
+      rows: [
+        ['weapon_1', 'Sniper Rifle', 'x100'],
+        ['weapon_2', 'Assault Rifle', 'x100'],
+        ['weapon_3', 'Pistol', 'x2500'],
+        ['weapon_4', 'Submachine Gun', 'x100'],
+        ['weapon_5, weapon_5_e', 'Revolver', 'x250'],
+        ['weapon_6_0 (weapon_6_38 for texture)', 'Shotgun', 'x0.1'],
+        ['weapon_7', 'Machine Gun', 'x100'],
+        ['weapon_8_0', 'Semi Auto', 'x100'],
+        ['weapon_9', 'Rocket Launcher', 'x100'],
+        ['weapon_10_0', 'Akimbo Uzi', 'x1'],
+        ['weapon_11, weapon_11_e', 'Desert Eagle', 'x1'],
+        ['weapon_12_5, weapon_12_5_e', 'Alien Blaster', 'x1'],
+        ['weapon_14', 'Crossbow', 'x100'],
+        ['weapon_15', 'Famas', 'x100'],
+        ['weapon_16', 'Sawed off', 'x1'],
+        ['weapon_17', 'Auto Pistol', 'x100'],
+        ['weapon_19', 'Blaster', 'x100'],
+        ['weapon_21, weapon_21_e', 'Grappler', 'x1'],
+        ['weapon_22', 'Techy-9', 'x100'],
+        ['weapon_23', 'Noob tube', 'x1'],
+        ['weapon_25, weapon_25_e', 'Zapper', 'x1'],
+        ['weapon_28', 'Akimbo Pistol', 'x1'],
+        ['weapon_29', 'Infiltrator/Charge Rifle', 'x100'],
+        ['weapon_31', 'Compressor', 'x1'],
+      ],
+    },
+    {
+      title: 'Weapon File Naming (Mod Files)',
+      note: 'Use these exact weapon_X names when naming files inside your mod / Resource Swapper folder.',
+      headers: ['Weapon File(s)', 'Weapon'],
+      rows: [
+        ['weapon_0', 'Fists'],
+        ['weapon_1', 'Sniper Rifle'],
+        ['weapon_2', 'Assault Rifle'],
+        ['weapon_3', 'Pistol'],
+        ['weapon_4', 'Submachine Gun'],
+        ['weapon_5, weapon_5_e', 'Revolver'],
+        ['weapon_6_0 (weapon_6_38 for texture)', 'Shotgun'],
+        ['weapon_7', 'Machine Gun'],
+        ['weapon_8_0', 'Semi Auto'],
+        ['weapon_9', 'Rocket Launcher'],
+        ['weapon_10_0', 'Akimbo Uzi'],
+        ['weapon_11, weapon_11_e', 'Desert Eagle'],
+        ['weapon_12_5', 'Alien Blaster'],
+        ['weapon_13', 'Old Alien Blaster'],
+        ['weapon_14', 'Crossbow'],
+        ['weapon_15', 'Famas'],
+        ['weapon_16', 'Sawed off'],
+        ['weapon_17', 'Auto Pistol'],
+        ['weapon_18', 'Bomb'],
+        ['weapon_19', 'Blaster'],
+        ['weapon_20', 'Build Tool'],
+        ['weapon_21, weapon_21_e', 'Grappler'],
+        ['weapon_22', 'Techy-9'],
+        ['weapon_23', 'Noob tube'],
+        ['weapon_24', 'Slimer'],
+        ['weapon_25, weapon_25_e', 'Zapper'],
+        ['weapon_26', 'Juggernaut'],
+        ['weapon_27', 'Unreleased grenade launcher'],
+        ['weapon_28', 'Akimbo Pistol'],
+        ['weapon_29', 'Infiltrator/Charge Rifle'],
+        ['weapon_31', 'Compressor'],
+      ],
+    },
+  ],
+};
+
+function renderModsGuide(node, main, crumbs){
+  const c = MODS_GUIDE_CONTENT;
+  const el = document.getElementById('content');
+  el.innerHTML = `
+    <div class="breadcrumb">${crumbs}</div>
+    <div class="content-head">
+      <div class="content-icon">${icon(main.glyph)}</div>
+      <h2>${node.label}</h2>
+    </div>
+    <p class="content-desc">${escapeHtml(c.intro)}</p>
+
+    <h3 class="mod-guide-heading">How to Mod Manually (Resource Swapper)</h3>
+    <ol class="mod-guide-steps">
+      ${c.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+    </ol>
+
+    <h3 class="mod-guide-heading">Video Guides</h3>
+    ${videoGuideCardsHtml(c.videos)}
+
+    <h3 class="mod-guide-heading">Useful Resources</h3>
+    <div class="mod-guide-resources">
+      ${c.resources.map(r => `
+        <a class="mod-guide-resource-card" href="${r.url}" target="_blank" rel="noopener">
+          <div class="mod-guide-resource-icon">${icon(r.icon)}</div>
+          <div>
+            <div class="mod-guide-resource-title">${escapeHtml(r.title)}</div>
+            <div class="mod-guide-resource-desc">${escapeHtml(r.desc)}</div>
           </div>
         </a>
       `).join('')}
     </div>
+
+    ${c.tables.map(t => `
+      <h3 class="mod-guide-heading">${escapeHtml(t.title)}</h3>
+      <p class="mod-guide-table-note">${escapeHtml(t.note)}</p>
+      <div class="mod-guide-table-wrap">
+        <table class="mod-guide-table">
+          <thead><tr>${t.headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${t.rows.map(row => `<tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`).join('')}
+          </tbody>
+        </table>
+      </div>
+    `).join('')}
   `;
 }
 
@@ -669,6 +844,11 @@ function renderContent(){
 
   if(VIDEO_GUIDE_SECTIONS[node.id]){
     renderVideoGuide(node, main, crumbs);
+    return;
+  }
+
+  if(node.id === 'mods-guide'){
+    renderModsGuide(node, main, crumbs);
     return;
   }
 

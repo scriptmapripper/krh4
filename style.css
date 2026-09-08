@@ -257,6 +257,46 @@ ul.tree ul.tree{margin-left:16px; border-left:1px dashed var(--border-strong); p
   font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px; color:var(--text-0); margin-bottom:6px;
 }
 .video-guide-summary{ font-size:13px; color:var(--text-2); line-height:1.5; }
+
+/* ---------- Modding Guide page ---------- */
+.mod-guide-heading{
+  font-family:'Rajdhani',sans-serif; font-weight:700; font-size:19px; color:var(--text-0);
+  margin:34px 0 14px;
+}
+.mod-guide-steps{ list-style:none; counter-reset:modstep; display:flex; flex-direction:column; gap:10px; }
+.mod-guide-steps li{
+  counter-increment:modstep; position:relative; padding:12px 16px 12px 46px;
+  border:1px solid var(--border); border-radius:12px; background:rgba(255,255,255,.02);
+  color:var(--text-1); font-size:14.5px; line-height:1.55;
+}
+.mod-guide-steps li::before{
+  content:counter(modstep); position:absolute; left:14px; top:50%; transform:translateY(-50%);
+  width:22px; height:22px; border-radius:50%; background:var(--purple); color:#0a0d12;
+  font-family:'Rajdhani',sans-serif; font-weight:700; font-size:13px;
+  display:flex; align-items:center; justify-content:center;
+}
+.mod-guide-resources{ display:grid; grid-template-columns:repeat(auto-fill, minmax(240px,1fr)); gap:14px; }
+.mod-guide-resource-card{
+  display:flex; align-items:flex-start; gap:12px; padding:16px; border-radius:14px;
+  border:1px solid var(--border); background:rgba(255,255,255,.02); text-decoration:none;
+  transition:.15s ease;
+}
+.mod-guide-resource-card:hover{ transform:translateY(-2px); border-color:var(--border-strong); }
+.mod-guide-resource-icon{ width:34px; height:34px; flex:none; color:var(--purple); }
+.mod-guide-resource-icon svg{ width:100%; height:100%; }
+.mod-guide-resource-title{ font-family:'Rajdhani',sans-serif; font-weight:700; font-size:15px; color:var(--text-0); margin-bottom:4px; }
+.mod-guide-resource-desc{ font-size:13px; color:var(--text-2); line-height:1.5; }
+.mod-guide-table-note{ font-size:13px; color:var(--text-2); margin-bottom:12px; }
+.mod-guide-table-wrap{ overflow-x:auto; border:1px solid var(--border); border-radius:14px; }
+.mod-guide-table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+.mod-guide-table th, .mod-guide-table td{ padding:10px 14px; text-align:left; white-space:nowrap; }
+.mod-guide-table th{
+  background:rgba(178,107,247,.1); color:var(--text-0); font-family:'Rajdhani',sans-serif;
+  font-weight:700; letter-spacing:.3px; border-bottom:1px solid var(--border);
+}
+.mod-guide-table td{ color:var(--text-1); border-bottom:1px solid var(--border); }
+.mod-guide-table tr:last-child td{ border-bottom:none; }
+.mod-guide-table tr:hover td{ background:rgba(255,255,255,.02); }
 .gallery-actions{ display:flex; gap:6px; margin-top:6px; flex-wrap:wrap; justify-content:center; }
 .gallery-btn{
   font-family:'Rajdhani',sans-serif; font-size:12px; font-weight:600; padding:6px 10px;
