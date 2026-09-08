@@ -776,12 +776,16 @@ async function loadFileGallery(cat){
     container.innerHTML = data.map(p => {
       const isOwner = currentUser && p.author_id === currentUser.id;
       let fileUrl = p.content;
+      let fileName = '';
       let description = '';
+      let isJsonContent = false;
       try {
         const parsed = JSON.parse(p.content);
         if (parsed && typeof parsed === 'object' && parsed.file_url) {
           fileUrl = parsed.file_url;
+          fileName = parsed.file_name || '';
           description = parsed.description || '';
+          isJsonContent = true;
         }
       } catch (e) { /* not JSON — treat content as a plain file URL, as before */ }
       const urlExt = (fileUrl || '').split('.').pop().split(/[?#]/)[0];
@@ -794,12 +798,13 @@ async function loadFileGallery(cat){
         <div class="file-info">
           <div class="gallery-title">${escapeHtml(p.title)}</div>
           <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
-          ${description ? `<div class="gallery-desc">${escapeHtml(description)}</div>` : ''}
+          ${isJsonContent ? `<div class="gallery-desc" id="desc-${p.id}" style="display:none;">${description ? escapeHtml(description) : 'No description provided.'}</div>` : ''}
         </div>
         <div class="gallery-actions">
+          ${isJsonContent ? `<button class="gallery-btn" data-action="toggle-desc" data-id="${p.id}">Description</button>` : ''}
           <a class="gallery-btn" href="${fileUrl}" download="${filename}" target="_blank" rel="noopener">Download</a>
           ${isOwner ? `
-            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}">Edit</button>
+            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}" data-desc="${encodeURIComponent(description)}" data-isjson="${isJsonContent ? '1' : '0'}" data-fileurl="${encodeURIComponent(fileUrl)}" data-filename="${encodeURIComponent(fileName)}">Edit</button>
             <button class="gallery-btn" data-action="delete" data-id="${p.id}">Delete</button>
           ` : ''}
         </div>
@@ -807,13 +812,40 @@ async function loadFileGallery(cat){
     `;
     }).join('');
 
+    container.querySelectorAll('[data-action="toggle-desc"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const el = document.getElementById(`desc-${id}`);
+        if (!el) return;
+        const showing = el.style.display !== 'none';
+        el.style.display = showing ? 'none' : 'block';
+        btn.textContent = showing ? 'Description' : 'Hide Description';
+      });
+    });
+
     container.querySelectorAll('[data-action="edit"]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const currentTitle = btn.getAttribute('data-title');
+        const isJson = btn.getAttribute('data-isjson') === '1';
+
         const newTitle = prompt('Edit title:', currentTitle);
-        if(newTitle === null || !newTitle.trim() || newTitle.trim() === currentTitle) return;
-        const { error } = await sb.from('posts').update({ title: newTitle.trim() }).eq('id', id);
+        if (newTitle === null) return; /* cancelled */
+        const trimmedTitle = newTitle.trim();
+        if (!trimmedTitle) { alert('Title cannot be empty.'); return; }
+
+        const updatePayload = { title: trimmedTitle };
+
+        if (isJson) {
+          const currentDesc = decodeURIComponent(btn.getAttribute('data-desc') || '');
+          const newDesc = prompt('Edit description:', currentDesc);
+          if (newDesc === null) return; /* cancelled */
+          const fileUrl = decodeURIComponent(btn.getAttribute('data-fileurl') || '');
+          const fileName = decodeURIComponent(btn.getAttribute('data-filename') || '');
+          updatePayload.content = JSON.stringify({ file_url: fileUrl, file_name: fileName, description: newDesc.trim() });
+        }
+
+        const { error } = await sb.from('posts').update(updatePayload).eq('id', id);
         if(error){ alert('Failed to update: ' + error.message); return; }
         loadFileGallery(cat);
       });
