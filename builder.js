@@ -508,7 +508,7 @@ const POST_LINKS = {
   'maps-official-infected': 'community/section.html?cat=maps-official-infected&title=Infected&filetype=txt,js',
   'maps-official-tdm': 'community/section.html?cat=maps-official-tdm&title=TDM&filetype=txt,js',
   'maps-custom-parkour': 'community/section.html?cat=maps-custom-parkour&title=Parkour&filetype=txt,js',
-  'mods-files': 'community/section.html?cat=mods-files&title=Mods%20Files',
+  'mods-files': 'community/section.html?cat=mods-files&title=Mods%20Files&filetype=zip&desc=1',
   'scripts-userscript-hack': 'community/section.html?cat=scripts-userscript-hack&title=Hack%20Script',
 };
 
@@ -527,6 +527,7 @@ const FILE_GALLERY_SECTIONS = {
   'maps-official-infected': { cat: 'maps-official-infected', title: 'Community Infected Maps', ext: 'txt,js' },
   'maps-official-tdm': { cat: 'maps-official-tdm', title: 'Community TDM Maps', ext: 'txt,js' },
   'maps-custom-parkour': { cat: 'maps-custom-parkour', title: 'Community Parkour Maps', ext: 'txt,js' },
+  'mods-files': { cat: 'mods-files', title: 'Community Mods Files', ext: 'zip' },
 };
 
 /* Leaf nodes that post Name + multiple preview screenshots + a single
@@ -774,7 +775,16 @@ async function loadFileGallery(cat){
 
     container.innerHTML = data.map(p => {
       const isOwner = currentUser && p.author_id === currentUser.id;
-      const urlExt = (p.content || '').split('.').pop().split(/[?#]/)[0];
+      let fileUrl = p.content;
+      let description = '';
+      try {
+        const parsed = JSON.parse(p.content);
+        if (parsed && typeof parsed === 'object' && parsed.file_url) {
+          fileUrl = parsed.file_url;
+          description = parsed.description || '';
+        }
+      } catch (e) { /* not JSON — treat content as a plain file URL, as before */ }
+      const urlExt = (fileUrl || '').split('.').pop().split(/[?#]/)[0];
       const safeExt = /^[a-z0-9]{1,8}$/i.test(urlExt) ? urlExt.toLowerCase() : '';
       const baseName = (p.title || 'file').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
       const filename = safeExt ? `${baseName}.${safeExt}` : baseName;
@@ -784,9 +794,10 @@ async function loadFileGallery(cat){
         <div class="file-info">
           <div class="gallery-title">${escapeHtml(p.title)}</div>
           <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
+          ${description ? `<div class="gallery-desc">${escapeHtml(description)}</div>` : ''}
         </div>
         <div class="gallery-actions">
-          <a class="gallery-btn" href="${p.content}" download="${filename}" target="_blank" rel="noopener">Download</a>
+          <a class="gallery-btn" href="${fileUrl}" download="${filename}" target="_blank" rel="noopener">Download</a>
           ${isOwner ? `
             <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}">Edit</button>
             <button class="gallery-btn" data-action="delete" data-id="${p.id}">Delete</button>

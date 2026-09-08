@@ -29,6 +29,10 @@
     <div id="pPreviewWrap" style="display:none; margin:12px 0;">
       <p class="hint" id="pFileName"></p>
     </div>
+    <div id="pDescWrap" style="display:none;">
+      <label>Description</label>
+      <textarea id="pDescription" placeholder="Describe what this is, how to install it, etc. (optional)"></textarea>
+    </div>
     <button class="btn green" id="btnPublish">Publish</button>
     <div class="msg" id="createMsg"></div>
   </div>
@@ -61,6 +65,7 @@ const FILETYPE_RAW = params.get("filetype") || null; /* e.g. "txt" or "txt,js" â
 /* List of allowed extensions, lowercase, no leading dot. e.g. ["txt","js"] */
 const FILETYPES = FILETYPE_RAW ? FILETYPE_RAW.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : [];
 const FILETYPE = FILETYPES[0] || null; /* kept for anything that only needs a single default extension */
+const SHOW_DESC = params.get("desc") === "1"; /* adds an optional description textarea alongside the file upload */
 
 document.title = TITLE + " â€” Krunker Resource Hub";
 document.getElementById("pageTitle").textContent = TITLE;
@@ -78,6 +83,10 @@ if (FILETYPES.length) {
   /* The gallery for this category now lives on the main placeholder page,
      so hide the inline feed card entirely to avoid duplicating it here. */
   document.getElementById("feedCard").style.display = "none";
+}
+
+if (FILETYPES.length && SHOW_DESC) {
+  document.getElementById("pDescWrap").style.display = "block";
 }
 
 document.getElementById("pFile")?.addEventListener("change", (e) => {
@@ -150,7 +159,13 @@ document.getElementById("btnPublish")?.addEventListener("click", async () => {
     }
 
     const { data: publicData } = sb.storage.from("post-files").getPublicUrl(path);
-    const content = publicData.publicUrl;
+    const content = SHOW_DESC
+      ? JSON.stringify({
+          file_url: publicData.publicUrl,
+          file_name: pendingFile.name,
+          description: document.getElementById("pDescription").value.trim(),
+        })
+      : publicData.publicUrl;
 
     const { error } = await sb.from("posts").insert({
       author_id: me.id, title, content, status: "published", category: CAT,
@@ -163,6 +178,7 @@ document.getElementById("btnPublish")?.addEventListener("click", async () => {
     msg.className = "msg ok show"; msg.textContent = "Posted!";
     document.getElementById("pTitle").value = "";
     document.getElementById("pFile").value = "";
+    if (SHOW_DESC) document.getElementById("pDescription").value = "";
     document.getElementById("pPreviewWrap").style.display = "none";
     pendingFile = null;
     try {
