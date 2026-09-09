@@ -973,7 +973,7 @@ const POST_LINKS = {
   'maps-custom-parkour': 'community/section.html?cat=maps-custom-parkour&title=Parkour&filetype=txt,js',
   'mods-files': 'community/section.html?cat=mods-files&title=Mods%20Files&filetype=zip&desc=1',
   'scripts-userscript-hack': 'community/section.html?cat=scripts-userscript-hack&title=Hack%20Script&filetype=txt,js,json&desc=1',
-  'scripts-krunkscript-usable': 'community/section.html?cat=scripts-krunkscript-usable&title=Usable%20KrunkScripts&filetype=txt,js,json&desc=1',
+  'scripts-krunkscript-usable': 'community/section.html?cat=scripts-krunkscript-usable&title=Usable%20KrunkScripts&filetype=txt,js,json&desc=1&multiple=1',
 };
 
 /* Leaf nodes that should show a live-rendered community gallery
@@ -1269,36 +1269,47 @@ async function loadFileGallery(cat){
 
     container.innerHTML = data.map(p => {
       const isOwner = currentUser && p.author_id === currentUser.id;
-      let fileUrl = p.content;
-      let fileName = '';
+      let files = [{ file_url: p.content, file_name: '' }];
       let description = '';
       let isJsonContent = false;
       try {
         const parsed = JSON.parse(p.content);
-        if (parsed && typeof parsed === 'object' && parsed.file_url) {
-          fileUrl = parsed.file_url;
-          fileName = parsed.file_name || '';
-          description = parsed.description || '';
-          isJsonContent = true;
+        if (parsed && typeof parsed === 'object') {
+          if (Array.isArray(parsed.files) && parsed.files.length) {
+            files = parsed.files.map(f => ({ file_url: f.file_url, file_name: f.file_name || '' }));
+            description = parsed.description || '';
+            isJsonContent = true;
+          } else if (parsed.file_url) {
+            files = [{ file_url: parsed.file_url, file_name: parsed.file_name || '' }];
+            description = parsed.description || '';
+            isJsonContent = true;
+          }
         }
       } catch (e) { /* not JSON — treat content as a plain file URL, as before */ }
-      const urlExt = (fileUrl || '').split('.').pop().split(/[?#]/)[0];
-      const safeExt = /^[a-z0-9]{1,8}$/i.test(urlExt) ? urlExt.toLowerCase() : '';
-      const baseName = (p.title || 'file').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
-      const filename = safeExt ? `${baseName}.${safeExt}` : baseName;
+
+      const isMulti = files.length > 1;
+      const downloadButtonsHtml = files.map((f, idx) => {
+        const urlExt = (f.file_url || '').split('.').pop().split(/[?#]/)[0];
+        const safeExt = /^[a-z0-9]{1,8}$/i.test(urlExt) ? urlExt.toLowerCase() : '';
+        const baseName = (f.file_name ? f.file_name.replace(/\.[a-z0-9]{1,8}$/i, '') : (p.title || 'file')).replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
+        const filename = safeExt ? `${baseName}.${safeExt}` : baseName;
+        const label = isMulti ? (f.file_name || `File ${idx + 1}`) : 'Download';
+        return `<button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(f.file_url)}" data-filename="${encodeURIComponent(filename)}">${isMulti ? '\u2913 ' + escapeHtml(label) : label}</button>`;
+      }).join('');
+
       return `
       <div class="file-card">
         <div class="file-icon">📄</div>
         <div class="file-info">
           <div class="gallery-title">${escapeHtml(p.title)}</div>
-          <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
+          <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}${isMulti ? ` · ${files.length} files` : ''}</div>
           ${isJsonContent ? `<div class="gallery-desc" id="desc-${p.id}" style="display:none;">${description ? escapeHtml(description) : 'No description provided.'}</div>` : ''}
         </div>
         <div class="gallery-actions">
           ${isJsonContent ? `<button class="gallery-btn" data-action="toggle-desc" data-id="${p.id}">Description</button>` : ''}
-          <button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(fileUrl)}" data-filename="${encodeURIComponent(filename)}">Download</button>
+          ${downloadButtonsHtml}
           ${isOwner ? `
-            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}" data-desc="${encodeURIComponent(description)}" data-isjson="${isJsonContent ? '1' : '0'}" data-fileurl="${encodeURIComponent(fileUrl)}" data-filename="${encodeURIComponent(fileName)}">Edit</button>
+            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}" data-desc="${encodeURIComponent(description)}" data-isjson="${isJsonContent ? '1' : '0'}" data-files="${encodeURIComponent(JSON.stringify(files))}">Edit</button>
             <button class="gallery-btn" data-action="delete" data-id="${p.id}">Delete</button>
           ` : ''}
         </div>
@@ -1342,9 +1353,13 @@ async function loadFileGallery(cat){
           const currentDesc = decodeURIComponent(btn.getAttribute('data-desc') || '');
           const newDesc = prompt('Edit description:', currentDesc);
           if (newDesc === null) return; /* cancelled */
-          const fileUrl = decodeURIComponent(btn.getAttribute('data-fileurl') || '');
-          const fileName = decodeURIComponent(btn.getAttribute('data-filename') || '');
-          updatePayload.content = JSON.stringify({ file_url: fileUrl, file_name: fileName, description: newDesc.trim() });
+          const files = JSON.parse(decodeURIComponent(btn.getAttribute('data-files') || '[]'));
+          if (files.length > 1) {
+            updatePayload.content = JSON.stringify({ files, description: newDesc.trim() });
+          } else {
+            const f = files[0] || { file_url: '', file_name: '' };
+            updatePayload.content = JSON.stringify({ file_url: f.file_url, file_name: f.file_name, description: newDesc.trim() });
+          }
         }
 
         const { error } = await sb.from('posts').update(updatePayload).eq('id', id);

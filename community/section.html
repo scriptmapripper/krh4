@@ -56,7 +56,7 @@
 <script src="supabase-client.js"></script>
 <script>
 let me = null;
-let pendingFile = null;
+let pendingFiles = []; /* array of File objects — single-file mode just keeps this at length 1 */
 
 const params = new URLSearchParams(window.location.search);
 const CAT = params.get("cat") || "crosshair";
@@ -66,6 +66,7 @@ const FILETYPE_RAW = params.get("filetype") || null; /* e.g. "txt" or "txt,js" �
 const FILETYPES = FILETYPE_RAW ? FILETYPE_RAW.split(",").map(s => s.trim().toLowerCase()).filter(Boolean) : [];
 const FILETYPE = FILETYPES[0] || null; /* kept for anything that only needs a single default extension */
 const SHOW_DESC = params.get("desc") === "1"; /* adds an optional description textarea alongside the file upload */
+const MULTIPLE = params.get("multiple") === "1"; /* allows selecting/uploading more than one file per post */
 
 document.title = TITLE + " — Krunker Resource Hub";
 document.getElementById("pageTitle").textContent = TITLE;
@@ -76,10 +77,11 @@ document.getElementById("feedHeading").textContent = `All ${TITLE} Posts`;
 if (FILETYPES.length) {
   document.getElementById("pContent").style.display = "none";
   const extLabel = FILETYPES.map(ext => "." + ext).join(" or ");
-  document.getElementById("contentLabel").textContent = `${TITLE} File (${extLabel})`;
+  document.getElementById("contentLabel").textContent = `${TITLE} File${MULTIPLE ? "(s)" : ""} (${extLabel})`;
   const fileInput = document.getElementById("pFile");
   fileInput.style.display = "block";
   fileInput.accept = FILETYPES.map(ext => "." + ext).join(",");
+  if (MULTIPLE) fileInput.multiple = true;
   /* The gallery for this category now lives on the main placeholder page,
      so hide the inline feed card entirely to avoid duplicating it here. */
   document.getElementById("feedCard").style.display = "none";
@@ -91,21 +93,26 @@ if (FILETYPES.length && SHOW_DESC) {
 
 document.getElementById("pFile")?.addEventListener("change", (e) => {
   const msg = document.getElementById("createMsg");
-  const file = e.target.files[0];
-  if (!file) return;
-  const ext = (file.name.split(".").pop() || "").toLowerCase();
-  if (FILETYPES.length && !FILETYPES.includes(ext)) {
-    const extLabel = FILETYPES.map(x => "." + x).join(" or ");
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  const extLabel = FILETYPES.map(x => "." + x).join(" or ");
+  const badFile = files.find(f => {
+    const ext = (f.name.split(".").pop() || "").toLowerCase();
+    return FILETYPES.length && !FILETYPES.includes(ext);
+  });
+  if (badFile) {
     msg.className = "msg error show";
-    msg.textContent = `Only ${extLabel} files are allowed.`;
+    msg.textContent = `"${badFile.name}" isn't allowed \u2014 only ${extLabel} files are allowed.`;
     e.target.value = "";
-    pendingFile = null;
+    pendingFiles = [];
     document.getElementById("pPreviewWrap").style.display = "none";
     return;
   }
   msg.className = ""; msg.textContent = "";
-  pendingFile = file;
-  document.getElementById("pFileName").textContent = `Selected: ${file.name}`;
+  pendingFiles = files;
+  document.getElementById("pFileName").textContent = files.length > 1
+    ? `Selected ${files.length} files: ${files.map(f => f.name).join(", ")}`
+    : `Selected: ${files[0].name}`;
   document.getElementById("pPreviewWrap").style.display = "block";
 });
 
@@ -135,37 +142,54 @@ document.getElementById("btnPublish")?.addEventListener("click", async () => {
 
   if (FILETYPES.length) {
     const extLabel = FILETYPES.map(x => "." + x).join(" or ");
-    if (!title || !pendingFile) {
-      msg.className = "msg error show"; msg.textContent = `Title & a ${extLabel} file are required.`;
+    if (!title || !pendingFiles.length) {
+      msg.className = "msg error show";
+      msg.textContent = `Title & ${MULTIPLE ? "at least one" : "a"} ${extLabel} file are required.`;
       return;
     }
-    const fileExt = (pendingFile.name.split(".").pop() || "").toLowerCase();
-    if (!FILETYPES.includes(fileExt)) {
+    const badFile = pendingFiles.find(f => {
+      const ext = (f.name.split(".").pop() || "").toLowerCase();
+      return !FILETYPES.includes(ext);
+    });
+    if (badFile) {
       msg.className = "msg error show"; msg.textContent = `Only ${extLabel} files are allowed.`;
       return;
     }
     const btn = document.getElementById("btnPublish");
     btn.disabled = true; btn.textContent = "Publishing...";
 
-    const path = `${me.id}/${CAT}-${Date.now()}.${fileExt}`;
-    const { error: uploadError } = await sb.storage
-      .from("post-files")
-      .upload(path, pendingFile, { upsert: true, cacheControl: "3600" });
+    const uploaded = [];
+    for (const file of pendingFiles) {
+      const fileExt = (file.name.split(".").pop() || "").toLowerCase();
+      const path = `${me.id}/${CAT}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${fileExt}`;
+      const { error: uploadError } = await sb.storage
+        .from("post-files")
+        .upload(path, file, { upsert: true, cacheControl: "3600" });
 
-    if (uploadError) {
-      msg.className = "msg error show"; msg.textContent = uploadError.message;
-      btn.disabled = false; btn.textContent = "Publish";
-      return;
+      if (uploadError) {
+        msg.className = "msg error show"; msg.textContent = uploadError.message;
+        btn.disabled = false; btn.textContent = "Publish";
+        return;
+      }
+      const { data: publicData } = sb.storage.from("post-files").getPublicUrl(path);
+      uploaded.push({ file_url: publicData.publicUrl, file_name: file.name });
     }
 
-    const { data: publicData } = sb.storage.from("post-files").getPublicUrl(path);
-    const content = SHOW_DESC
-      ? JSON.stringify({
-          file_url: publicData.publicUrl,
-          file_name: pendingFile.name,
-          description: document.getElementById("pDescription").value.trim(),
-        })
-      : publicData.publicUrl;
+    let content;
+    if (MULTIPLE) {
+      content = JSON.stringify({
+        files: uploaded,
+        description: SHOW_DESC ? document.getElementById("pDescription").value.trim() : "",
+      });
+    } else if (SHOW_DESC) {
+      content = JSON.stringify({
+        file_url: uploaded[0].file_url,
+        file_name: uploaded[0].file_name,
+        description: document.getElementById("pDescription").value.trim(),
+      });
+    } else {
+      content = uploaded[0].file_url;
+    }
 
     const { error } = await sb.from("posts").insert({
       author_id: me.id, title, content, status: "published", category: CAT,
@@ -180,7 +204,7 @@ document.getElementById("btnPublish")?.addEventListener("click", async () => {
     document.getElementById("pFile").value = "";
     if (SHOW_DESC) document.getElementById("pDescription").value = "";
     document.getElementById("pPreviewWrap").style.display = "none";
-    pendingFile = null;
+    pendingFiles = [];
     try {
       if (window.parent && typeof window.parent.loadFileGallery === "function") {
         window.parent.loadFileGallery(CAT);
