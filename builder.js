@@ -105,6 +105,7 @@ const DATA = [
             ] },
         ] },
       { id:'scripts-userscript', label:'UserScript', children:[
+          { id:'scripts-userscript-setup-guide', label:'UserScript Setup Guide' },
           { id:'scripts-userscript-legal', label:'Legal Script' },
           { id:'scripts-userscript-hack', label:'Hack Script' },
         ] },
@@ -752,6 +753,104 @@ function renderModsGuide(node, main, crumbs){
   `;
 }
 
+/* Dedicated content for the Scripts > UserScript > UserScript Setup Guide page. */
+const SCRIPTS_GUIDE_CONTENT = {
+  intro: 'UserScripts are pieces of JavaScript code that can change how Krunker actually behaves \u2014 not just how it looks. That makes them extremely powerful, but also risky: it\u2019s the same category of script that in-game hackers rely on, so installing the wrong one can get your account banned. Always know exactly what a script does before you install it.',
+  steps: [
+    'Open your Krunker client, then go to Settings \u2192 Client \u2192 UserScripts, and open that folder.',
+    'Drop your .js userscript file(s) into that folder (if you see an existing "social" folder in there, leave it alone).',
+    'Restart your Krunker client so it picks up the new scripts.',
+  ],
+  bonusHeading: 'Bonus: Add a Custom Killstreak Sound',
+  bonusSteps: [
+    'Download a killstreak sound-pack tool (an .exe) \u2014 see Useful Resources below.',
+    'Right-click the .exe and choose Open.',
+    'In your client, copy the path to your UserScripts folder, then paste it into the tool as the game script path.',
+    'Preview the different killstreak sounds using the site linked below, and pick one you like.',
+    'Click Activate on your chosen sound pack, close the tool, and restart Krunker.',
+  ],
+  examplesHeading: 'Example UserScripts Covered in the Video',
+  examples: [
+    'A script that plays the headshot sound on every kill, not just headshot kills.',
+    'A script that pops up a little emote/GIF whenever you get a kill.',
+    'A script that mutes the headshot sound entirely.',
+    'A script that changes the in-game sky color.',
+    'A Valorant-style killstreak sound pack, triggered on kill streaks.',
+  ],
+  videos: [
+    {
+      id: 'b82BEE-1psg',
+      url: 'https://youtu.be/b82BEE-1psg?t=115',
+      title: 'Krunker CSS, Mods & UserScripts — Complete Beginner\u2019s Guide',
+      summary: 'Explains what a userscript is and why it\u2019s riskier than CSS or mods, then walks through installing userscripts via the UserScripts folder, adding a Valorant-style killstreak sound pack, and testing a handful of example scripts in-game.',
+    },
+  ],
+  resources: [
+    {
+      title: 'Krunker Design Hub Discord',
+      desc: 'Community Discord for Krunker CSS, mods, GFX, and userscripts.',
+      url: 'https://discord.gg/GJnT4eP8eA',
+      icon: 'server',
+    },
+    {
+      title: 'Arnas Discord',
+      desc: 'Source Discord for userscripts \u2014 download and share userscripts here.',
+      url: 'https://discord.gg/yCwMKFfZ3g',
+      icon: 'server',
+    },
+    {
+      title: 'Valorant Kill Banners',
+      desc: 'Preview Valorant-style killstreak sounds before adding one to Krunker.',
+      url: 'https://kingdomarchives.com/killbanners',
+      icon: 'sparkles',
+    },
+  ],
+};
+
+function renderScriptsGuide(node, main, crumbs){
+  const c = SCRIPTS_GUIDE_CONTENT;
+  const el = document.getElementById('content');
+  el.innerHTML = `
+    <div class="breadcrumb">${crumbs}</div>
+    <div class="content-head">
+      <div class="content-icon">${icon(main.glyph)}</div>
+      <h2>${node.label}</h2>
+    </div>
+    <p class="content-desc">${escapeHtml(c.intro)}</p>
+
+    <h3 class="mod-guide-heading">How to Install a UserScript</h3>
+    <ol class="mod-guide-steps">
+      ${c.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+    </ol>
+
+    <h3 class="mod-guide-heading">${escapeHtml(c.bonusHeading)}</h3>
+    <ol class="mod-guide-steps">
+      ${c.bonusSteps.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+    </ol>
+
+    <h3 class="mod-guide-heading">${escapeHtml(c.examplesHeading)}</h3>
+    <ol class="mod-guide-steps">
+      ${c.examples.map(s => `<li>${escapeHtml(s)}</li>`).join('')}
+    </ol>
+
+    <h3 class="mod-guide-heading">Video Guide</h3>
+    ${videoGuideCardsHtml(c.videos)}
+
+    <h3 class="mod-guide-heading">Useful Resources</h3>
+    <div class="mod-guide-resources">
+      ${c.resources.map(r => `
+        <a class="mod-guide-resource-card" href="${r.url}" target="_blank" rel="noopener">
+          <div class="mod-guide-resource-icon">${icon(r.icon)}</div>
+          <div>
+            <div class="mod-guide-resource-title">${escapeHtml(r.title)}</div>
+            <div class="mod-guide-resource-desc">${escapeHtml(r.desc)}</div>
+          </div>
+        </a>
+      `).join('')}
+    </div>
+  `;
+}
+
 /* Leaf nodes that stay as a plain placeholder by default, but offer a
    "Create Post" button that loads the real community post page on demand. */
 const POST_LINKS = {
@@ -849,6 +948,11 @@ function renderContent(){
 
   if(node.id === 'mods-guide'){
     renderModsGuide(node, main, crumbs);
+    return;
+  }
+
+  if(node.id === 'scripts-userscript-setup-guide'){
+    renderScriptsGuide(node, main, crumbs);
     return;
   }
 
