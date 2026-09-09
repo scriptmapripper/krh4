@@ -544,25 +544,25 @@ function renderLinkPage(node, main, crumbs){
    thumbnail, title, and a short written summary of the video. */
 const VIDEO_GUIDE_SECTIONS = {
   'css-setup-guide': {
-    intro: 'Video tutorial buat setup & pasang CSS di Krunker.',
+    intro: 'Video tutorials on setting up and installing CSS in Krunker.',
     videos: [
       {
         id: 'b82BEE-1psg',
-        url: 'https://youtu.be/b82BEE-1psg',
+        url: 'https://youtu.be/b82BEE-1psg?t=27',
         title: 'Krunker CSS, Mods & UserScripts — Complete Beginner\u2019s Guide',
-        summary: 'Covers the basics: CSS restyles Krunker\u2019s UI, mods swap out visual/audio assets like textures, sounds, and models, and userscripts are JavaScript code that can change how the game behaves \u2014 powerful, but risky if you install the wrong one. Shows where to find community CSS, mods, and userscripts (the Krunker Design Hub Discord and a public CSS site), then walks through installing CSS and userscripts via the Resource Swapper folder, plus how to build a mod manually by dropping texture/sound/model files into swapper subfolders.',
+        summary: 'Explains what CSS actually does in Krunker \u2014 it restyles the game\u2019s UI (buttons, layout, everything you see) without changing how the game works. Shows where to find public, already-working CSS code, then walks through turning that code into a working style: creating a "css" folder in your Resource Swapper, saving the code as a .css file inside it, and restarting your client to see it applied.',
       },
       {
         id: 'dDiSRh3f7wU',
         url: 'https://youtu.be/dDiSRh3f7wU',
         title: 'Krunker CSS, Mods & UserScripts — Complete Beginner\u2019s Guide',
-        summary: 'Covers the basics: CSS restyles Krunker\u2019s UI, mods swap out visual/audio assets like textures, sounds, and models, and userscripts are JavaScript code that can change how the game behaves \u2014 powerful, but risky if you install the wrong one. Shows where to find community CSS, mods, and userscripts (the Krunker Design Hub Discord and a public CSS site), then walks through installing CSS and userscripts via the Resource Swapper folder, plus how to build a mod manually by dropping texture/sound/model files into swapper subfolders.',
+        summary: 'Explains what CSS actually does in Krunker \u2014 it restyles the game\u2019s UI (buttons, layout, everything you see) without changing how the game works. Shows where to find public, already-working CSS code, then walks through turning that code into a working style: creating a "css" folder in your Resource Swapper, saving the code as a .css file inside it, and restarting your client to see it applied.',
       },
       {
         id: 'XdWRIjCArgU',
         url: 'https://youtu.be/XdWRIjCArgU',
         title: 'Krunker CSS, Mods & UserScripts — Complete Beginner\u2019s Guide',
-        summary: 'Covers the basics: CSS restyles Krunker\u2019s UI, mods swap out visual/audio assets like textures, sounds, and models, and userscripts are JavaScript code that can change how the game behaves \u2014 powerful, but risky if you install the wrong one. Shows where to find community CSS, mods, and userscripts (the Krunker Design Hub Discord and a public CSS site), then walks through installing CSS and userscripts via the Resource Swapper folder, plus how to build a mod manually by dropping texture/sound/model files into swapper subfolders.',
+        summary: 'Explains what CSS actually does in Krunker \u2014 it restyles the game\u2019s UI (buttons, layout, everything you see) without changing how the game works. Shows where to find public, already-working CSS code, then walks through turning that code into a working style: creating a "css" folder in your Resource Swapper, saving the code as a .css file inside it, and restarting your client to see it applied.',
       },
     ],
   },
