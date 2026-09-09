@@ -966,11 +966,11 @@ const POST_LINKS = {
   'crosshair-crosshairs': 'community/crosshairs.html',
   'crosshair-scope': 'community/image-section.html?cat=crosshair-scope&title=Scope',
   'crosshair-hitmarker': 'community/image-section.html?cat=crosshair-hitmarker&title=Hitmarker',
-  'settings-ready': 'community/section.html?cat=settings-ready&title=Ready%20Settings&filetype=txt',
+  'settings-ready': 'community/section.html?cat=settings-ready&title=Ready%20Settings&filetype=txt&desc=1',
   'css-ready': 'community/css-post.html',
-  'maps-official-infected': 'community/section.html?cat=maps-official-infected&title=Infected&filetype=txt,js',
-  'maps-official-tdm': 'community/section.html?cat=maps-official-tdm&title=TDM&filetype=txt,js',
-  'maps-custom-parkour': 'community/section.html?cat=maps-custom-parkour&title=Parkour&filetype=txt,js',
+  'maps-official-infected': 'community/section.html?cat=maps-official-infected&title=Infected&filetype=txt,js&desc=1',
+  'maps-official-tdm': 'community/section.html?cat=maps-official-tdm&title=TDM&filetype=txt,js&desc=1',
+  'maps-custom-parkour': 'community/section.html?cat=maps-custom-parkour&title=Parkour&filetype=txt,js&desc=1',
   'mods-files': 'community/section.html?cat=mods-files&title=Mods%20Files&filetype=zip&desc=1',
   'scripts-userscript-hack': 'community/section.html?cat=scripts-userscript-hack&title=Hack%20Script&filetype=txt,js,json&desc=1',
   'scripts-krunkscript-usable': 'community/section.html?cat=scripts-krunkscript-usable&title=Usable%20KrunkScripts&filetype=txt,js,json&desc=1&multiple=1',
@@ -1162,21 +1162,27 @@ async function loadCrosshairGallery(cat){
     if(document.getElementById('crosshairGallery') !== container) return; /* navigated away */
 
     container.innerHTML = data.map((p, i) => {
-      const isImage = /^https?:\/\//.test(p.content);
+      let parsed = null;
+      try { parsed = JSON.parse(p.content); } catch(e) { /* legacy plain URL or crosshair code */ }
+      const imageUrl = parsed?.file_url || (/^https?:\/\//.test(p.content) ? p.content : null);
+      const description = parsed?.description || '';
+      const isImage = !!imageUrl;
       const isOwner = currentUser && p.author_id === currentUser.id;
       return `
       <div class="gallery-card">
         ${isImage
-          ? `<img class="gallery-canvas" src="${p.content}" alt="${escapeHtml(p.title)}">`
+          ? `<img class="gallery-canvas" src="${imageUrl}" alt="${escapeHtml(p.title)}">`
           : `<canvas class="gallery-canvas" id="ghCanvas${i}" width="120" height="120"></canvas>`}
         <div class="gallery-title">${escapeHtml(p.title)}</div>
         <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
+        ${parsed ? `<div class="gallery-desc" id="ch-desc-${p.id}" style="display:none;">${description ? escapeHtml(description) : 'No description provided.'}</div>` : ''}
         <div class="gallery-actions">
+          ${parsed ? `<button class="gallery-btn" data-action="toggle-desc" data-id="${p.id}">Description</button>` : ''}
           ${isImage
-            ? `<button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(p.content)}" data-filename="${encodeURIComponent((p.title || 'crosshair').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase() + '.png')}">Download PNG</button>`
+            ? `<button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(imageUrl)}" data-filename="${encodeURIComponent((p.title || 'crosshair').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase() + '.png')}">Download PNG</button>`
             : `<button class="gallery-btn" data-action="download" data-code="${encodeURIComponent(p.content)}" data-name="${escapeHtml(p.title)}">Download PNG</button>`}
           ${isOwner ? `
-            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}">Edit</button>
+            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}" data-desc="${encodeURIComponent(description)}" data-isjson="${parsed ? '1' : '0'}" data-fileurl="${encodeURIComponent(imageUrl || '')}">Edit</button>
             <button class="gallery-btn" data-action="delete" data-id="${p.id}">Delete</button>
           ` : ''}
         </div>
@@ -1185,7 +1191,10 @@ async function loadCrosshairGallery(cat){
     }).join('');
 
     data.forEach((p, i) => {
-      if(/^https?:\/\//.test(p.content)) return; /* real image, nothing to draw */
+      let parsed = null;
+      try { parsed = JSON.parse(p.content); } catch(e) { /* not JSON */ }
+      const imageUrl = parsed?.file_url || (/^https?:\/\//.test(p.content) ? p.content : null);
+      if(imageUrl) return; /* real image, nothing to draw */
       const canvas = document.getElementById(`ghCanvas${i}`);
       if(!canvas) return;
       const state = typeof decodeCrosshairCode === 'function' ? decodeCrosshairCode(p.content) : null;
@@ -1222,13 +1231,38 @@ async function loadCrosshairGallery(cat){
         link.click();
       });
     });
+    container.querySelectorAll('[data-action="toggle-desc"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const el = document.getElementById(`ch-desc-${id}`);
+        if (!el) return;
+        const showing = el.style.display !== 'none';
+        el.style.display = showing ? 'none' : 'block';
+        btn.textContent = showing ? 'Description' : 'Hide Description';
+      });
+    });
     container.querySelectorAll('[data-action="edit"]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const currentTitle = btn.getAttribute('data-title');
+        const isJson = btn.getAttribute('data-isjson') === '1';
+
         const newTitle = prompt('Edit title:', currentTitle);
-        if(newTitle === null || !newTitle.trim() || newTitle.trim() === currentTitle) return;
-        const { error } = await sb.from('posts').update({ title: newTitle.trim() }).eq('id', id);
+        if (newTitle === null) return; /* cancelled */
+        const trimmedTitle = newTitle.trim();
+        if (!trimmedTitle) { alert('Title cannot be empty.'); return; }
+
+        const updatePayload = { title: trimmedTitle };
+
+        if (isJson) {
+          const currentDesc = decodeURIComponent(btn.getAttribute('data-desc') || '');
+          const newDesc = prompt('Edit description:', currentDesc);
+          if (newDesc === null) return; /* cancelled */
+          const fileUrl = decodeURIComponent(btn.getAttribute('data-fileurl') || '');
+          updatePayload.content = JSON.stringify({ file_url: fileUrl, description: newDesc.trim() });
+        }
+
+        const { error } = await sb.from('posts').update(updatePayload).eq('id', id);
         if(error){ alert('Failed to update: ' + error.message); return; }
         loadCrosshairGallery(cat);
       });
@@ -1408,6 +1442,7 @@ async function loadCssGallery(){
       const previews = parsed?.previews || [];
       const fileUrl = parsed?.file_url || (parsed ? null : p.content);
       const fileName = parsed?.file_name || (p.title || 'file') + '.txt';
+      const description = parsed?.description || '';
       const isOwner = currentUser && p.author_id === currentUser.id;
 
       const previewHtml = previews.length
@@ -1420,10 +1455,12 @@ async function loadCssGallery(){
         ${previews.length > 1 ? `<div class="gallery-meta">+${previews.length - 1} more preview${previews.length - 1 > 1 ? 's' : ''}</div>` : ''}
         <div class="gallery-title">${escapeHtml(p.title)}</div>
         <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
+        ${parsed ? `<div class="gallery-desc" id="css-desc-${p.id}" style="display:none;">${description ? escapeHtml(description) : 'No description provided.'}</div>` : ''}
         <div class="gallery-actions">
+          ${parsed ? `<button class="gallery-btn" data-action="toggle-desc" data-id="${p.id}">Description</button>` : ''}
           ${fileUrl ? `<button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(fileUrl)}" data-filename="${encodeURIComponent(fileName)}">Download</button>` : ''}
           ${isOwner ? `
-            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}">Edit</button>
+            <button class="gallery-btn" data-action="edit" data-id="${p.id}" data-title="${escapeHtml(p.title)}" data-desc="${encodeURIComponent(description)}" data-isjson="${parsed ? '1' : '0'}" data-fileurl="${encodeURIComponent(fileUrl || '')}" data-filename="${encodeURIComponent(parsed?.file_name || '')}" data-previews="${encodeURIComponent(JSON.stringify(previews))}">Edit</button>
             <button class="gallery-btn" data-action="delete" data-id="${p.id}">Delete</button>
           ` : ''}
         </div>
@@ -1439,13 +1476,41 @@ async function loadCssGallery(){
       });
     });
 
+    container.querySelectorAll('[data-action="toggle-desc"]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.getAttribute('data-id');
+        const el = document.getElementById(`css-desc-${id}`);
+        if (!el) return;
+        const showing = el.style.display !== 'none';
+        el.style.display = showing ? 'none' : 'block';
+        btn.textContent = showing ? 'Description' : 'Hide Description';
+      });
+    });
+
     container.querySelectorAll('[data-action="edit"]').forEach(btn => {
       btn.addEventListener('click', async () => {
         const id = btn.getAttribute('data-id');
         const currentTitle = btn.getAttribute('data-title');
+        const isJson = btn.getAttribute('data-isjson') === '1';
+
         const newTitle = prompt('Edit name:', currentTitle);
-        if(newTitle === null || !newTitle.trim() || newTitle.trim() === currentTitle) return;
-        const { error } = await sb.from('posts').update({ title: newTitle.trim() }).eq('id', id);
+        if (newTitle === null) return; /* cancelled */
+        const trimmedTitle = newTitle.trim();
+        if (!trimmedTitle) { alert('Name cannot be empty.'); return; }
+
+        const updatePayload = { title: trimmedTitle };
+
+        if (isJson) {
+          const currentDesc = decodeURIComponent(btn.getAttribute('data-desc') || '');
+          const newDesc = prompt('Edit description:', currentDesc);
+          if (newDesc === null) return; /* cancelled */
+          const fileUrl = decodeURIComponent(btn.getAttribute('data-fileurl') || '');
+          const fileName = decodeURIComponent(btn.getAttribute('data-filename') || '');
+          const previews = JSON.parse(decodeURIComponent(btn.getAttribute('data-previews') || '[]'));
+          updatePayload.content = JSON.stringify({ file_url: fileUrl, file_name: fileName, previews, description: newDesc.trim() });
+        }
+
+        const { error } = await sb.from('posts').update(updatePayload).eq('id', id);
         if(error){ alert('Failed to update: ' + error.message); return; }
         loadCssGallery();
       });

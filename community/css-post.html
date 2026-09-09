@@ -68,6 +68,9 @@
       <button type="button" id="btnRemoveFile">✕</button>
     </div>
 
+    <label style="margin-top:16px;">Description</label>
+    <textarea id="pDescription" placeholder="Describe this CSS, how to install it, etc. (optional)"></textarea>
+
     <button class="btn green" id="btnPublish" style="margin-top:18px;">Publish</button>
     <div class="msg" id="createMsg"></div>
   </div>
@@ -210,6 +213,7 @@ document.getElementById("btnPublish").addEventListener("click", async () => {
       file_url: fileData.publicUrl,
       file_name: mainFile.name,
       previews: previewUrls,
+      description: document.getElementById("pDescription").value.trim(),
     });
 
     const { error } = await sb.from("posts").insert({
@@ -219,6 +223,7 @@ document.getElementById("btnPublish").addEventListener("click", async () => {
 
     msg.className = "msg ok show"; msg.textContent = "Posted!";
     document.getElementById("pTitle").value = "";
+    document.getElementById("pDescription").value = "";
     previewFiles = []; previewGrid.innerHTML = "";
     mainFile = null; fileInput.value = ""; fileChip.style.display = "none";
 
