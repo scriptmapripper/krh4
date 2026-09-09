@@ -851,6 +851,104 @@ function renderScriptsGuide(node, main, crumbs){
   `;
 }
 
+/* Static, repo-bundled official map files (Pubs / Parkour / Raids under
+   Maps > Official Maps). These aren't community posts — the .json files
+   ship in resources/maps/ and are served same-origin, so a plain
+   <a download> link works fine without the cross-origin blob trick. */
+const STATIC_MAP_LISTS = {
+  'maps-official-pubs': {
+    title: 'Official Pub Maps',
+    intro: 'Original Krunker public-match maps, ready to drop into your Resource Swapper or map editor.',
+    files: [
+      { title: 'Arena', path: 'resources/maps/pubs/Arena.json' },
+      { title: 'Atomic', path: 'resources/maps/pubs/Atomic.json' },
+      { title: 'Bazaar', path: 'resources/maps/pubs/Bazaar.json' },
+      { title: 'Bureau', path: 'resources/maps/pubs/Bureau.json' },
+      { title: 'Burg', path: 'resources/maps/pubs/Burg.json' },
+      { title: 'Citadel', path: 'resources/maps/pubs/Citadel.json' },
+      { title: 'Clockwork', path: 'resources/maps/pubs/Clockwork.json' },
+      { title: 'Erupt', path: 'resources/maps/pubs/Erupt.json' },
+      { title: 'Eterno Simulator', path: 'resources/maps/pubs/Eterno Simulator.json' },
+      { title: 'Evacuation', path: 'resources/maps/pubs/Evacuation.json' },
+      { title: 'Freight', path: 'resources/maps/pubs/Freight.json' },
+      { title: 'HQ', path: 'resources/maps/pubs/HQ.json' },
+      { title: 'Habitat', path: 'resources/maps/pubs/Habitat.json' },
+      { title: 'Industry', path: 'resources/maps/pubs/Industry.json' },
+      { title: 'Kanji', path: 'resources/maps/pubs/Kanji.json' },
+      { title: 'Krunk Plaza', path: 'resources/maps/pubs/Krunk_Plaza.json' },
+      { title: 'Lagoon', path: 'resources/maps/pubs/Lagoon.json' },
+      { title: 'Littletown', path: 'resources/maps/pubs/Littletown.json' },
+      { title: 'Lostworld', path: 'resources/maps/pubs/Lostworld.json' },
+      { title: 'Lumber', path: 'resources/maps/pubs/Lumber.json' },
+      { title: 'Lush', path: 'resources/maps/pubs/Lush.json' },
+      { title: 'Oasis', path: 'resources/maps/pubs/Oasis.json' },
+      { title: 'Old Burg', path: 'resources/maps/pubs/Old_Burg.json' },
+      { title: 'Sandstorm', path: 'resources/maps/pubs/Sandstorm.json' },
+      { title: 'Shipment', path: 'resources/maps/pubs/Shipment.json' },
+      { title: 'Shipyard', path: 'resources/maps/pubs/Shipyard.json' },
+      { title: 'Site', path: 'resources/maps/pubs/Site.json' },
+      { title: 'SkyTemple', path: 'resources/maps/pubs/SkyTemple.json' },
+      { title: 'Stalk Factory', path: 'resources/maps/pubs/Stalk Factory.json' },
+      { title: 'Stockade', path: 'resources/maps/pubs/Stockade.json' },
+      { title: 'Subzero', path: 'resources/maps/pubs/Subzero.json' },
+      { title: 'Throwback', path: 'resources/maps/pubs/Throwback.json' },
+      { title: 'Tropicano', path: 'resources/maps/pubs/Tropicano.json' },
+      { title: 'Undergrowth', path: 'resources/maps/pubs/Undergrowth.json' },
+      { title: 'Vivo', path: 'resources/maps/pubs/Vivo.json' },
+    ],
+  },
+  'maps-official-parkour': {
+    title: 'Official Parkour Maps',
+    intro: 'Official Krunker parkour maps.',
+    files: [
+      { title: 'Slide Moonlight', path: 'resources/maps/parkour/Slide Moonlight.json' },
+      { title: 'Eterno Jump', path: 'resources/maps/parkour/eterno_jump.json' },
+    ],
+  },
+  'maps-official-raids': {
+    title: 'Official Raids Maps',
+    intro: 'Official Krunker Raids game-mode maps.',
+    files: [
+      { title: 'Facility', path: 'resources/maps/raids/Facility.json' },
+      { title: 'Khepri', path: 'resources/maps/raids/Khepri.json' },
+      { title: 'Laboratory', path: 'resources/maps/raids/Laboratory.json' },
+      { title: 'Soul Sanctum', path: 'resources/maps/raids/Soul Sanctum.json' },
+      { title: 'Tortuga', path: 'resources/maps/raids/Tortuga.json' },
+    ],
+  },
+};
+
+function renderMapList(node, main, crumbs){
+  const section = STATIC_MAP_LISTS[node.id];
+  const el = document.getElementById('content');
+  el.innerHTML = `
+    <div class="breadcrumb">${crumbs}</div>
+    <div class="content-head">
+      <div class="content-icon">${icon(main.glyph)}</div>
+      <h2>${node.label}</h2>
+    </div>
+    <p class="content-desc">${escapeHtml(section.intro)}</p>
+    <div class="meta-strip">
+      <span class="chip">${escapeHtml(main.label)}</span>
+      <span class="chip">${section.files.length} map${section.files.length > 1 ? 's' : ''}</span>
+    </div>
+    <div class="file-gallery">
+      ${section.files.map(f => `
+        <div class="file-card">
+          <div class="file-icon">\uD83D\uDDFA\uFE0F</div>
+          <div class="file-info">
+            <div class="gallery-title">${escapeHtml(f.title)}</div>
+            <div class="gallery-meta">.json map file</div>
+          </div>
+          <div class="gallery-actions">
+            <a class="gallery-btn" href="${encodeURI(f.path)}" download="${escapeHtml(f.title)}.json">Download</a>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+}
+
 /* Leaf nodes that stay as a plain placeholder by default, but offer a
    "Create Post" button that loads the real community post page on demand. */
 const POST_LINKS = {
@@ -953,6 +1051,11 @@ function renderContent(){
 
   if(node.id === 'scripts-userscript-setup-guide'){
     renderScriptsGuide(node, main, crumbs);
+    return;
+  }
+
+  if(STATIC_MAP_LISTS[node.id]){
+    renderMapList(node, main, crumbs);
     return;
   }
 
