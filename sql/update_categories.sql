@@ -1,7 +1,11 @@
 -- Run this if your `posts` table already exists. This widens/updates the
 -- `category` constraint to allow posting under Crosshair, Ready Settings,
 -- Ready CSS, the Maps sub-sections, Mods Files, and the Scripts
--- sub-sections — and drops the old 'general' category entirely.
+-- sub-sections (including the newer Usable KrunkScripts) — and drops the
+-- old 'general' category entirely.
+--
+-- Safe to run again any time the allowed category list changes — every
+-- step here is idempotent.
 
 -- 1. Make sure the column exists at all (no-op if it's already there).
 alter table public.posts
@@ -20,10 +24,11 @@ alter table public.posts alter column category set default 'crosshair';
 --    "<table>_<column>_check").
 alter table public.posts drop constraint if exists posts_category_check;
 
--- 5. Re-add it with the full list of allowed categories ('general' removed).
+-- 5. Re-add it with the full list of allowed categories ('general' removed,
+--    'scripts-krunkscript-usable' added).
 alter table public.posts
   add constraint posts_category_check check (category in (
     'crosshair','crosshair-scope','crosshair-hitmarker','settings-ready','css-ready',
     'maps-official-infected','maps-official-tdm','maps-custom-parkour',
-    'mods-files','scripts-userscript-legal','scripts-userscript-hack'
+    'mods-files','scripts-userscript-legal','scripts-userscript-hack','scripts-krunkscript-usable'
   ));

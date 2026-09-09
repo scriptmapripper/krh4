@@ -99,6 +99,7 @@ const DATA = [
     children:[
       { id:'scripts-krunkscript', label:'KrunkScript', children:[
           { id:'scripts-krunkscript-generator', label:'Generator' },
+          { id:'scripts-krunkscript-usable', label:'Usable KrunkScripts' },
           { id:'scripts-krunkscript-docs', label:'Krunker Docs / Documentation', children:[
               { id:'scripts-krunkscript-docs-kr', label:'KR Docs' },
               { id:'scripts-krunkscript-docs-swatdoge', label:'Swatdoge' },
@@ -238,7 +239,7 @@ const TAG_COLORS = {
 /* Leaf nodes that already show a curated RESOURCE_LISTS grid, but should
    ALSO let the community post their own submissions below it. */
 const COMMUNITY_SECTIONS = {
-  'scripts-userscript-legal': { cat:'scripts-userscript-legal', title:'Legal Script' },
+  'scripts-userscript-legal': { cat:'scripts-userscript-legal', title:'Legal Script', filetype:'txt,js,json', desc:true },
 };
 
 const RESOURCE_LISTS = {
@@ -437,8 +438,14 @@ function renderResourceList(node, main, path, crumbs, color){
         <h2 style="margin:0;">Community Submissions</h2>
       </div>
       ${manualEmbedNodeId === node.id
-        ? `<iframe class="embed-frame" src="community/section.html?cat=${encodeURIComponent(COMMUNITY_SECTIONS[node.id].cat)}&title=${encodeURIComponent(COMMUNITY_SECTIONS[node.id].title)}" title="${COMMUNITY_SECTIONS[node.id].title} community submissions" loading="lazy"></iframe>`
+        ? `<iframe class="embed-frame" src="community/section.html?cat=${encodeURIComponent(COMMUNITY_SECTIONS[node.id].cat)}&title=${encodeURIComponent(COMMUNITY_SECTIONS[node.id].title)}${COMMUNITY_SECTIONS[node.id].filetype ? `&filetype=${encodeURIComponent(COMMUNITY_SECTIONS[node.id].filetype)}` : ''}${COMMUNITY_SECTIONS[node.id].desc ? '&desc=1' : ''}" title="${COMMUNITY_SECTIONS[node.id].title} community submissions" loading="lazy"></iframe>`
         : `<button class="btn-createpost" id="btnCreatePostResource" style="margin-bottom:0;">Create Post</button>`}
+    ` : ''}
+    ${FILE_GALLERY_SECTIONS[node.id] ? `
+      <div class="gallery-wrap">
+        <h3 class="gallery-heading">${FILE_GALLERY_SECTIONS[node.id].title || 'Community Files'}</h3>
+        <div class="file-gallery" id="fileGallery"><div class="gallery-empty">Loading...</div></div>
+      </div>
     ` : ''}
   `;
 
@@ -447,6 +454,10 @@ function renderResourceList(node, main, path, crumbs, color){
       manualEmbedNodeId = node.id;
       renderResourceList(node, main, path, crumbs, color);
     });
+  }
+
+  if(FILE_GALLERY_SECTIONS[node.id]){
+    loadFileGallery(FILE_GALLERY_SECTIONS[node.id].cat);
   }
 
   el.querySelectorAll('.resource-card').forEach(card => {
@@ -961,7 +972,8 @@ const POST_LINKS = {
   'maps-official-tdm': 'community/section.html?cat=maps-official-tdm&title=TDM&filetype=txt,js',
   'maps-custom-parkour': 'community/section.html?cat=maps-custom-parkour&title=Parkour&filetype=txt,js',
   'mods-files': 'community/section.html?cat=mods-files&title=Mods%20Files&filetype=zip&desc=1',
-  'scripts-userscript-hack': 'community/section.html?cat=scripts-userscript-hack&title=Hack%20Script',
+  'scripts-userscript-hack': 'community/section.html?cat=scripts-userscript-hack&title=Hack%20Script&filetype=txt,js,json&desc=1',
+  'scripts-krunkscript-usable': 'community/section.html?cat=scripts-krunkscript-usable&title=Usable%20KrunkScripts&filetype=txt,js,json&desc=1',
 };
 
 /* Leaf nodes that should show a live-rendered community gallery
@@ -980,6 +992,9 @@ const FILE_GALLERY_SECTIONS = {
   'maps-official-tdm': { cat: 'maps-official-tdm', title: 'Community TDM Maps', ext: 'txt,js' },
   'maps-custom-parkour': { cat: 'maps-custom-parkour', title: 'Community Parkour Maps', ext: 'txt,js' },
   'mods-files': { cat: 'mods-files', title: 'Community Mods Files', ext: 'zip' },
+  'scripts-userscript-legal': { cat: 'scripts-userscript-legal', title: 'Community Legal Scripts', ext: 'txt,js,json' },
+  'scripts-userscript-hack': { cat: 'scripts-userscript-hack', title: 'Community Hack Scripts', ext: 'txt,js,json' },
+  'scripts-krunkscript-usable': { cat: 'scripts-krunkscript-usable', title: 'Community KrunkScripts', ext: 'txt,js,json' },
 };
 
 /* Leaf nodes that post Name + multiple preview screenshots + a single

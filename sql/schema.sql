@@ -68,7 +68,7 @@ create table if not exists public.posts (
   category    text not null default 'crosshair' check (category in (
     'crosshair','crosshair-scope','crosshair-hitmarker','settings-ready','css-ready',
     'maps-official-infected','maps-official-tdm','maps-custom-parkour',
-    'mods-files','scripts-userscript-legal','scripts-userscript-hack'
+    'mods-files','scripts-userscript-legal','scripts-userscript-hack','scripts-krunkscript-usable'
   )),
   created_at  timestamptz not null default now(),
   updated_at  timestamptz not null default now()
@@ -79,7 +79,7 @@ create table if not exists public.posts (
 -- alter table public.posts add column if not exists category text not null default 'crosshair' check (category in (
 --   'crosshair','crosshair-scope','crosshair-hitmarker','settings-ready','css-ready',
 --   'maps-official-infected','maps-official-tdm','maps-custom-parkour',
---   'mods-files','scripts-userscript-legal','scripts-userscript-hack'
+--   'mods-files','scripts-userscript-legal','scripts-userscript-hack','scripts-krunkscript-usable'
 -- ));
 
 alter table public.posts enable row level security;
