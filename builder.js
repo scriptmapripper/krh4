@@ -48,6 +48,22 @@ async function downloadFileByUrl(url, filename, btn){
   }
 }
 
+/* Makes any element with [data-post-id] inside `container` clickable,
+   navigating to that post's dedicated detail page — unless the click
+   started on a button/link/input inside the card (so Download, Edit,
+   Delete, Description-toggle etc. keep working normally). */
+function wireCardNavigation(container){
+  if(!container) return;
+  container.querySelectorAll('[data-post-id]').forEach(card => {
+    card.style.cursor = 'pointer';
+    card.addEventListener('click', (e) => {
+      if(e.target.closest('button, a, input, textarea')) return;
+      const id = card.getAttribute('data-post-id');
+      window.location.href = `community/post.html?id=${encodeURIComponent(id)}`;
+    });
+  });
+}
+
 /* ---------------- data model (from mindmap) ---------------- */
 const DATA = [
   { id:'home', label:'Home', color:'blue', glyph:'home',
@@ -1169,7 +1185,7 @@ async function loadCrosshairGallery(cat){
       const isImage = !!imageUrl;
       const isOwner = currentUser && p.author_id === currentUser.id;
       return `
-      <div class="gallery-card">
+      <div class="gallery-card" data-post-id="${p.id}">
         ${isImage
           ? `<img class="gallery-canvas" src="${imageUrl}" alt="${escapeHtml(p.title)}">`
           : `<canvas class="gallery-canvas" id="ghCanvas${i}" width="120" height="120"></canvas>`}
@@ -1189,6 +1205,7 @@ async function loadCrosshairGallery(cat){
       </div>
     `;
     }).join('');
+    wireCardNavigation(container);
 
     data.forEach((p, i) => {
       let parsed = null;
@@ -1332,7 +1349,7 @@ async function loadFileGallery(cat){
       }).join('');
 
       return `
-      <div class="file-card">
+      <div class="file-card" data-post-id="${p.id}">
         <div class="file-icon">📄</div>
         <div class="file-info">
           <div class="gallery-title">${escapeHtml(p.title)}</div>
@@ -1350,6 +1367,7 @@ async function loadFileGallery(cat){
       </div>
     `;
     }).join('');
+    wireCardNavigation(container);
 
     container.querySelectorAll('[data-action="download-remote"]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1450,7 +1468,7 @@ async function loadCssGallery(){
         : `<div class="gallery-canvas" style="display:flex;align-items:center;justify-content:center;color:var(--text-2);font-size:24px;">📄</div>`;
 
       return `
-      <div class="gallery-card">
+      <div class="gallery-card" data-post-id="${p.id}">
         ${previewHtml}
         ${previews.length > 1 ? `<div class="gallery-meta">+${previews.length - 1} more preview${previews.length - 1 > 1 ? 's' : ''}</div>` : ''}
         <div class="gallery-title">${escapeHtml(p.title)}</div>
@@ -1467,6 +1485,7 @@ async function loadCssGallery(){
       </div>
     `;
     }).join('');
+    wireCardNavigation(container);
 
     container.querySelectorAll('[data-action="download-remote"]').forEach(btn => {
       btn.addEventListener('click', () => {

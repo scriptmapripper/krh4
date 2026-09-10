@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Post — Krunker Resource Hub</title>
+<link rel="stylesheet" href="community.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  .post-hero{ display:flex; gap:24px; flex-wrap:wrap; }
+  .post-hero-media{
+    flex:0 0 260px; width:260px; max-width:100%; border-radius:14px; overflow:hidden;
+    border:1px solid var(--border); background:var(--bg-1);
+    display:flex; align-items:center; justify-content:center; aspect-ratio:1/1;
+  }
+  .post-hero-media img{ width:100%; height:100%; object-fit:cover; display:block; }
+  .post-hero-media .file-fallback{ font-size:56px; }
+  .post-hero-body{ flex:1; min-width:240px; }
+  .post-cat-badge{
+    display:inline-block; padding:4px 11px; border-radius:20px; font-size:11.5px; font-weight:700;
+    letter-spacing:.3px; background:rgba(96,165,250,.14); color:var(--blue-glow); margin-bottom:12px;
+  }
+  .post-title{ font-family:'Orbitron',sans-serif; font-size:26px; margin-bottom:8px; line-height:1.25; }
+  .post-byline{ display:flex; align-items:center; gap:9px; color:var(--text-2); font-size:13px; margin-bottom:18px; }
+  .post-desc{ color:var(--text-1); font-size:14.5px; line-height:1.6; white-space:pre-wrap; margin-bottom:20px; }
+  .post-files{ display:flex; flex-direction:column; gap:8px; margin-bottom:6px; }
+  .post-file-row{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    border:1px solid var(--border); border-radius:10px; padding:10px 14px; background:var(--surface-2);
+  }
+  .post-file-name{ font-size:13.5px; color:var(--text-0); font-weight:600; word-break:break-all; }
+  .post-owner-actions{ display:flex; gap:8px; margin-top:18px; flex-wrap:wrap; }
+  .preview-strip{ display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .preview-strip img{
+    width:64px; height:64px; object-fit:cover; border-radius:8px; border:1px solid var(--border); cursor:pointer;
+  }
+  .preview-strip img.active{ border-color:var(--blue-glow); }
+
+  .comment-item{ display:flex; gap:12px; padding:14px 0; border-bottom:1px solid var(--border); }
+  .comment-item:last-child{ border-bottom:none; }
+  .comment-body{ flex:1; min-width:0; }
+  .comment-head{ display:flex; align-items:center; gap:8px; margin-bottom:4px; flex-wrap:wrap; }
+  .comment-author{ font-weight:700; font-size:13.5px; color:var(--text-0); }
+  .comment-date{ font-size:11.5px; color:var(--text-2); }
+  .comment-text{ font-size:14px; color:var(--text-1); line-height:1.55; white-space:pre-wrap; word-break:break-word; }
+  .comment-del{
+    background:none; border:none; color:var(--text-2); font-size:12px; cursor:pointer; padding:2px 0;
+  }
+  .comment-del:hover{ color:#ff8b8b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand"><a href="../index.html">◂ Krunker Resource Hub</a></div>
+    <div class="topnav" id="topnav"></div>
+  </div>
+
+  <div class="card" id="loadingCard"><p class="subtitle" style="margin:0;">Loading post...</p></div>
+
+  <div class="card" id="notFoundCard" style="display:none;">
+    <h1>Post not found</h1>
+    <p class="subtitle" style="margin-bottom:0;">This post may have been removed, or the link is incorrect.</p>
+  </div>
+
+  <div class="card" id="postCard" style="display:none;">
+    <div class="post-hero">
+      <div class="post-hero-media" id="postMedia"></div>
+      <div class="post-hero-body">
+        <span class="post-cat-badge" id="postCatBadge"></span>
+        <h1 class="post-title" id="postTitle"></h1>
+        <div class="post-byline" id="postByline"></div>
+        <div class="post-desc" id="postDesc"></div>
+        <div class="post-files" id="postFiles"></div>
+        <div class="post-owner-actions" id="postOwnerActions" style="display:none;">
+          <button class="btn-ghost" id="btnEditPost">Edit</button>
+          <button class="btn-ghost" id="btnDeletePost">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="commentsCard" style="display:none;">
+    <h2>Comments</h2>
+
+    <div id="commentFormWrap" style="display:none; margin-bottom:22px;">
+      <textarea id="cContent" placeholder="Write a comment..." style="min-height:90px;"></textarea>
+      <button class="btn" id="btnPostComment" style="margin-top:10px;">Post Comment</button>
+      <div class="msg" id="commentMsg"></div>
+    </div>
+    <div id="commentLoginPrompt" style="display:none; margin-bottom:22px;">
+      <p class="subtitle" style="margin-bottom:12px;">Log in to leave a comment.</p>
+      <a href="login.html" class="btn ghost" style="display:inline-flex; width:auto; padding:10px 20px;">Login</a>
+    </div>
+
+    <div id="commentList"><p class="empty">Loading comments...</p></div>
+  </div>
+</div>
+
+<script src="supabase-client.js"></script>
+<script src="../crosshair-render.js"></script>
+<script>
+const CATEGORY_LABELS = {
+  'crosshair': 'Crosshair',
+  'crosshair-scope': 'Crosshair Scope',
+  'crosshair-hitmarker': 'Crosshair Hitmarker',
+  'settings-ready': 'Ready Settings',
+  'css-ready': 'Ready CSS',
+  'maps-official-infected': 'Infected (Custom Maps)',
+  'maps-official-tdm': 'TDM (Custom Maps)',
+  'maps-custom-parkour': 'Parkour (Custom Maps)',
+  'mods-files': 'Mods Files',
+  'scripts-userscript-legal': 'Legal Script',
+  'scripts-userscript-hack': 'Hack Script',
+  'scripts-krunkscript-usable': 'Usable KrunkScripts',
+};
+const IMAGE_CATEGORIES = ['crosshair', 'crosshair-scope', 'crosshair-hitmarker'];
+
+const params = new URLSearchParams(window.location.search);
+const POST_ID = params.get('id');
+
+let me = null;
+let myProfile = null;
+let currentPost = null;
+
+/* Cross-origin files (Supabase Storage) ignore <a download>, so fetch as a
+   blob and trigger the download from a same-origin blob: URL instead. */
+async function downloadFileByUrl(url, filename, btn) {
+  const originalText = btn ? btn.textContent : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Downloading...'; }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('Download failed (' + res.status + ')');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 4000);
+  } catch (e) {
+    alert('Could not download the file automatically. Opening it in a new tab instead — use "Save As" there.');
+    window.open(url, '_blank', 'noopener');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
+  }
+}
+
+function safeFilename(name, url) {
+  const urlExt = (url || '').split('.').pop().split(/[?#]/)[0];
+  const safeExt = /^[a-z0-9]{1,8}$/i.test(urlExt) ? urlExt.toLowerCase() : '';
+  const base = (name ? name.replace(/\.[a-z0-9]{1,8}$/i, '') : 'file').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase();
+  return safeExt ? `${base}.${safeExt}` : base;
+}
+
+async function boot() {
+  me = await getSessionUser();
+  myProfile = me ? await getMyProfile() : null;
+
+  const nav = document.getElementById('topnav');
+  nav.innerHTML = '';
+  if (me) {
+    nav.innerHTML = `<a href="dashboard.html">Dashboard</a>`;
+  } else {
+    nav.innerHTML = `<a href="login.html">Login</a><a href="signup.html">Sign Up</a>`;
+  }
+
+  if (!POST_ID) { showNotFound(); return; }
+
+  const { data: post, error } = await sb
+    .from('posts')
+    .select('*, profiles!posts_author_id_fkey(username,display_name,avatar_url,role)')
+    .eq('id', POST_ID)
+    .maybeSingle();
+
+  if (error || !post) { showNotFound(); return; }
+
+  const isOwner = me && post.author_id === me.id;
+  const isStaff = myProfile && (myProfile.role === 'admin' || myProfile.role === 'developer');
+  if (post.status !== 'published' && !isOwner && !isStaff) { showNotFound(); return; }
+
+  currentPost = post;
+  renderPost(post, isOwner || isStaff);
+  loadComments();
+}
+
+function showNotFound() {
+  document.getElementById('loadingCard').style.display = 'none';
+  document.getElementById('notFoundCard').style.display = 'block';
+}
+
+function parseContent(post) {
+  let parsed = null;
+  try { parsed = JSON.parse(post.content); } catch (e) { /* legacy plain content */ }
+
+  if (parsed && typeof parsed === 'object') {
+    if (Array.isArray(parsed.files) && parsed.files.length) {
+      return { files: parsed.files, description: parsed.description || '', previews: [] };
+    }
+    if (parsed.file_url) {
+      return {
+        files: [{ file_url: parsed.file_url, file_name: parsed.file_name || '' }],
+        description: parsed.description || '',
+        previews: parsed.previews || [],
+      };
+    }
+  }
+  if (/^https?:\/\//.test(post.content)) {
+    return { files: [{ file_url: post.content, file_name: '' }], description: '', previews: [] };
+  }
+  /* Legacy crosshair code string (crosshair category only) */
+  return { files: [], description: '', previews: [], crosshairCode: post.content };
+}
+
+function renderPost(post, canManage) {
+  document.getElementById('loadingCard').style.display = 'none';
+  document.getElementById('postCard').style.display = 'block';
+  document.getElementById('commentsCard').style.display = 'block';
+
+  const c = parseContent(post);
+  const isImageCat = IMAGE_CATEGORIES.includes(post.category);
+  const mainImage = isImageCat ? (c.files[0]?.file_url || null) : (c.previews[0] || null);
+
+  document.title = `${post.title} — Krunker Resource Hub`;
+  document.getElementById('postCatBadge').textContent = CATEGORY_LABELS[post.category] || post.category;
+  document.getElementById('postTitle').textContent = post.title;
+
+  const author = post.profiles;
+  document.getElementById('postByline').innerHTML = `
+    ${avatarHtml(author, 26)}
+    <span>${escapeHtml(author?.display_name || '?')}</span>
+    <span>·</span>
+    <span>${formatDate(post.created_at)}</span>
+    ${post.status !== 'published' ? `<span class="status-pill status-draft">Draft</span>` : ''}
+  `;
+
+  document.getElementById('postDesc').textContent = c.description || (c.files.length || c.crosshairCode ? '' : 'No description provided.');
+  if (!c.description) document.getElementById('postDesc').style.display = 'none';
+
+  const media = document.getElementById('postMedia');
+  if (mainImage) {
+    media.innerHTML = `<img id="heroImg" src="${mainImage}" alt="${escapeHtml(post.title)}">`;
+  } else if (c.crosshairCode) {
+    media.innerHTML = `<canvas id="heroCanvas" width="220" height="220"></canvas>`;
+    const state = typeof decodeCrosshairCode === 'function' ? decodeCrosshairCode(c.crosshairCode) : null;
+    if (state) {
+      renderCrosshairToCanvas(document.getElementById('heroCanvas'), state);
+    }
+  } else {
+    media.innerHTML = `<div class="file-fallback">📄</div>`;
+  }
+
+  if (c.previews && c.previews.length > 1) {
+    const strip = document.createElement('div');
+    strip.className = 'preview-strip';
+    strip.innerHTML = c.previews.map((url, i) => `<img src="${url}" class="${i === 0 ? 'active' : ''}" data-src="${url}">`).join('');
+    document.getElementById('postMedia').insertAdjacentElement('afterend', strip);
+    strip.querySelectorAll('img').forEach(thumb => {
+      thumb.addEventListener('click', () => {
+        document.getElementById('heroImg').src = thumb.getAttribute('data-src');
+        strip.querySelectorAll('img').forEach(t => t.classList.remove('active'));
+        thumb.classList.add('active');
+      });
+    });
+  }
+
+  const filesWrap = document.getElementById('postFiles');
+  if (!isImageCat && c.files.length) {
+    filesWrap.innerHTML = c.files.map((f, i) => `
+      <div class="post-file-row">
+        <span class="post-file-name">${escapeHtml(f.file_name || `File ${i + 1}`)}</span>
+        <button class="btn-ghost" data-dl-url="${encodeURIComponent(f.file_url)}" data-dl-name="${encodeURIComponent(safeFilename(f.file_name, f.file_url))}">Download</button>
+      </div>
+    `).join('');
+    filesWrap.querySelectorAll('[data-dl-url]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        downloadFileByUrl(decodeURIComponent(btn.getAttribute('data-dl-url')), decodeURIComponent(btn.getAttribute('data-dl-name')), btn);
+      });
+    });
+  } else if (isImageCat && c.files[0]) {
+    filesWrap.innerHTML = `
+      <div class="post-file-row">
+        <span class="post-file-name">Image (PNG)</span>
+        <button class="btn-ghost" data-dl-url="${encodeURIComponent(c.files[0].file_url)}" data-dl-name="${encodeURIComponent(safeFilename(post.title, c.files[0].file_url) + '.png')}">Download PNG</button>
+      </div>
+    `;
+    filesWrap.querySelector('[data-dl-url]').addEventListener('click', (e) => {
+      const btn = e.currentTarget;
+      downloadFileByUrl(decodeURIComponent(btn.getAttribute('data-dl-url')), decodeURIComponent(btn.getAttribute('data-dl-name')), btn);
+    });
+  } else if (c.crosshairCode) {
+    filesWrap.innerHTML = `<div class="post-file-row"><span class="post-file-name">Legacy crosshair code</span></div>`;
+  }
+
+  if (canManage) {
+    document.getElementById('postOwnerActions').style.display = 'flex';
+    document.getElementById('btnEditPost').addEventListener('click', () => editPost(post, c));
+    document.getElementById('btnDeletePost').addEventListener('click', () => deletePost(post.id));
+  }
+}
+
+async function editPost(post, parsedContent) {
+  const newTitle = prompt('Edit title:', post.title);
+  if (newTitle === null) return;
+  const trimmedTitle = newTitle.trim();
+  if (!trimmedTitle) { alert('Title cannot be empty.'); return; }
+
+  const updatePayload = { title: trimmedTitle };
+
+  /* Only offer to edit the description for posts stored as JSON (i.e. that
+     actually have a description field to begin with). */
+  let parsedOriginal = null;
+  try { parsedOriginal = JSON.parse(post.content); } catch (e) { /* legacy */ }
+  if (parsedOriginal && typeof parsedOriginal === 'object') {
+    const newDesc = prompt('Edit description:', parsedContent.description || '');
+    if (newDesc === null) return;
+    const rebuilt = { ...parsedOriginal, description: newDesc.trim() };
+    updatePayload.content = JSON.stringify(rebuilt);
+  }
+
+  const { error } = await sb.from('posts').update(updatePayload).eq('id', post.id);
+  if (error) { alert('Failed to update: ' + error.message); return; }
+  window.location.reload();
+}
+
+async function deletePost(id) {
+  if (!confirm('Delete this post? This cannot be undone.')) return;
+  const { error } = await sb.from('posts').delete().eq('id', id);
+  if (error) { alert('Failed to delete: ' + error.message); return; }
+  window.location.href = '../index.html';
+}
+
+async function loadComments() {
+  const listEl = document.getElementById('commentList');
+
+  if (me) {
+    document.getElementById('commentFormWrap').style.display = 'block';
+  } else {
+    document.getElementById('commentLoginPrompt').style.display = 'block';
+  }
+
+  const { data, error } = await sb
+    .from('comments')
+    .select('*, profiles!comments_author_id_fkey(username,display_name,avatar_url)')
+    .eq('post_id', POST_ID)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    listEl.innerHTML = `<p class="empty">Failed to load comments.</p>`;
+    return;
+  }
+  if (!data.length) {
+    listEl.innerHTML = `<p class="empty">No comments yet. Be the first!</p>`;
+    return;
+  }
+
+  listEl.innerHTML = data.map(c => {
+    const isOwner = me && c.author_id === me.id;
+    const isStaff = myProfile && (myProfile.role === 'admin' || myProfile.role === 'developer');
+    return `
+    <div class="comment-item">
+      ${avatarHtml(c.profiles, 34)}
+      <div class="comment-body">
+        <div class="comment-head">
+          <span class="comment-author">${escapeHtml(c.profiles?.display_name || '?')}</span>
+          <span class="comment-date">${formatDate(c.created_at)}</span>
+        </div>
+        <div class="comment-text">${escapeHtml(c.content)}</div>
+        ${(isOwner || isStaff) ? `<button class="comment-del" data-id="${c.id}">Delete</button>` : ''}
+      </div>
+    </div>
+  `;
+  }).join('');
+
+  listEl.querySelectorAll('.comment-del').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this comment?')) return;
+      const { error } = await sb.from('comments').delete().eq('id', btn.getAttribute('data-id'));
+      if (error) { alert('Failed to delete: ' + error.message); return; }
+      loadComments();
+    });
+  });
+}
+
+document.getElementById('btnPostComment')?.addEventListener('click', async () => {
+  const msg = document.getElementById('commentMsg');
+  const textarea = document.getElementById('cContent');
+  const content = textarea.value.trim();
+  if (!content) {
+    msg.className = 'msg error show'; msg.textContent = 'Write something before posting.';
+    return;
+  }
+  const btn = document.getElementById('btnPostComment');
+  btn.disabled = true; btn.textContent = 'Posting...';
+
+  const { error } = await sb.from('comments').insert({
+    post_id: POST_ID, author_id: me.id, content,
+  });
+
+  btn.disabled = false; btn.textContent = 'Post Comment';
+  if (error) {
+    msg.className = 'msg error show'; msg.textContent = error.message;
+    return;
+  }
+  msg.className = ''; msg.textContent = '';
+  textarea.value = '';
+  loadComments();
+});
+
+boot();
+</script>
+</body>
+</html>
