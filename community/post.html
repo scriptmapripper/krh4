@@ -47,6 +47,27 @@
     background:none; border:none; color:var(--text-2); font-size:12px; cursor:pointer; padding:2px 0;
   }
   .comment-del:hover{ color:#ff8b8b; }
+  .comment-actions{ display:flex; gap:6px; margin-top:8px; flex-wrap:wrap; }
+  .comment-action-btn{
+    font-family:'Rajdhani',sans-serif; font-size:12px; font-weight:600; padding:5px 10px;
+    border-radius:7px; border:1px solid var(--border-strong); background:rgba(255,255,255,.03);
+    color:var(--text-2); cursor:pointer; transition:.15s ease;
+  }
+  .comment-action-btn:hover{ color:var(--text-0); background:rgba(255,255,255,.07); }
+  .comment-action-btn.active-like{ color:var(--green); border-color:var(--green); }
+  .comment-action-btn.active-dislike{ color:var(--red); border-color:var(--red); }
+  .comment-action-btn.comment-del{ border:none; background:none; padding:5px 4px; }
+  .comment-action-btn.comment-del:hover{ color:#ff8b8b; }
+
+  .post-reaction-btn{
+    font-family:'Rajdhani',sans-serif; font-size:14px; font-weight:700; padding:9px 16px;
+    border-radius:9px; border:1px solid var(--border-strong); background:rgba(255,255,255,.04);
+    color:var(--text-1); cursor:pointer; transition:.15s ease;
+  }
+  .post-reaction-btn:hover{ color:var(--text-0); background:rgba(255,255,255,.08); }
+  .post-reaction-btn.active-like{ color:var(--green); border-color:var(--green); background:rgba(47,208,106,.12); }
+  .post-reaction-btn.active-dislike{ color:var(--red); border-color:var(--red); background:rgba(240,69,69,.12); }
+  .post-reaction-btn.active-save{ color:var(--orange); border-color:var(--orange); background:rgba(245,165,36,.12); }
 </style>
 </head>
 <body>
@@ -70,6 +91,7 @@
         <span class="post-cat-badge" id="postCatBadge"></span>
         <h1 class="post-title" id="postTitle"></h1>
         <div class="post-byline" id="postByline"></div>
+        <div class="post-reactions" id="postReactions" style="display:flex; gap:8px; margin-bottom:18px;"></div>
         <div class="post-desc" id="postDesc"></div>
         <div class="post-files" id="postFiles"></div>
         <div class="post-owner-actions" id="postOwnerActions" style="display:none;">
@@ -155,6 +177,79 @@ function safeFilename(name, url) {
   return safeExt ? `${base}.${safeExt}` : base;
 }
 
+/* Fires a notification into someone's inbox. Silently skips notifying
+   yourself (liking/commenting on your own stuff shouldn't ping you), and
+   never throws — a failed notification insert shouldn't block the action
+   that triggered it. */
+async function sendNotification({ userId, type, postId, postTitle, commentId, reason }) {
+  if (!me || !userId || userId === me.id) return;
+  try {
+    await sb.from('notifications').insert({
+      user_id: userId,
+      type,
+      actor_id: me.id,
+      post_id: postId || null,
+      post_title: postTitle || null,
+      comment_id: commentId || null,
+      reason: reason || null,
+    });
+  } catch (e) { /* best-effort */ }
+}
+
+async function renderReactions() {
+  const wrap = document.getElementById('postReactions');
+
+  const { data: reactions } = await sb.from('post_reactions').select('user_id,type').eq('post_id', POST_ID);
+  const counts = { like: 0, dislike: 0 };
+  let myReaction = null;
+  (reactions || []).forEach(r => {
+    counts[r.type]++;
+    if (me && r.user_id === me.id) myReaction = r.type;
+  });
+
+  let isSaved = false;
+  if (me) {
+    const { data: save } = await sb.from('post_saves').select('id').eq('post_id', POST_ID).eq('user_id', me.id).maybeSingle();
+    isSaved = !!save;
+  }
+
+  wrap.innerHTML = `
+    <button class="post-reaction-btn${myReaction === 'like' ? ' active-like' : ''}" id="btnLike">\u{1F44D} ${counts.like}</button>
+    <button class="post-reaction-btn${myReaction === 'dislike' ? ' active-dislike' : ''}" id="btnDislike">\u{1F44E} ${counts.dislike}</button>
+    <button class="post-reaction-btn${isSaved ? ' active-save' : ''}" id="btnSave">${isSaved ? '\u2605' : '\u2606'} ${isSaved ? 'Saved' : 'Save'}</button>
+  `;
+
+  document.getElementById('btnLike').addEventListener('click', () => handleReaction('like'));
+  document.getElementById('btnDislike').addEventListener('click', () => handleReaction('dislike'));
+  document.getElementById('btnSave').addEventListener('click', handleSave);
+}
+
+async function handleReaction(type) {
+  if (!me) { alert('Log in to like or dislike posts.'); return; }
+  const { data: existing } = await sb.from('post_reactions').select('id,type').eq('post_id', POST_ID).eq('user_id', me.id).maybeSingle();
+  if (existing && existing.type === type) {
+    await sb.from('post_reactions').delete().eq('id', existing.id);
+  } else if (existing) {
+    await sb.from('post_reactions').update({ type }).eq('id', existing.id);
+    sendNotification({ userId: currentPost.author_id, type: type === 'like' ? 'post_like' : 'post_dislike', postId: POST_ID, postTitle: currentPost.title });
+  } else {
+    await sb.from('post_reactions').insert({ post_id: POST_ID, user_id: me.id, type });
+    sendNotification({ userId: currentPost.author_id, type: type === 'like' ? 'post_like' : 'post_dislike', postId: POST_ID, postTitle: currentPost.title });
+  }
+  renderReactions();
+}
+
+async function handleSave() {
+  if (!me) { alert('Log in to save posts.'); return; }
+  const { data: existing } = await sb.from('post_saves').select('id').eq('post_id', POST_ID).eq('user_id', me.id).maybeSingle();
+  if (existing) {
+    await sb.from('post_saves').delete().eq('id', existing.id);
+  } else {
+    await sb.from('post_saves').insert({ post_id: POST_ID, user_id: me.id });
+  }
+  renderReactions();
+}
+
 async function boot() {
   me = await getSessionUser();
   myProfile = me ? await getMyProfile() : null;
@@ -162,7 +257,7 @@ async function boot() {
   const nav = document.getElementById('topnav');
   nav.innerHTML = '';
   if (me) {
-    nav.innerHTML = `<a href="dashboard.html">Dashboard</a>`;
+    nav.innerHTML = `<a href="inbox.html">Inbox</a><a href="dashboard.html">Dashboard</a>`;
   } else {
     nav.innerHTML = `<a href="login.html">Login</a><a href="signup.html">Sign Up</a>`;
   }
@@ -182,7 +277,8 @@ async function boot() {
   if (post.status !== 'published' && !isOwner && !isStaff) { showNotFound(); return; }
 
   currentPost = post;
-  renderPost(post, isOwner || isStaff);
+  renderPost(post, isOwner, isStaff);
+  renderReactions();
   loadComments();
 }
 
@@ -214,7 +310,7 @@ function parseContent(post) {
   return { files: [], description: '', previews: [], crosshairCode: post.content };
 }
 
-function renderPost(post, canManage) {
+function renderPost(post, isOwner, isStaff) {
   document.getElementById('loadingCard').style.display = 'none';
   document.getElementById('postCard').style.display = 'block';
   document.getElementById('commentsCard').style.display = 'block';
@@ -294,14 +390,24 @@ function renderPost(post, canManage) {
     filesWrap.innerHTML = `<div class="post-file-row"><span class="post-file-name">Legacy crosshair code</span></div>`;
   }
 
-  if (canManage) {
-    document.getElementById('postOwnerActions').style.display = 'flex';
-    document.getElementById('btnEditPost').addEventListener('click', () => editPost(post, c));
-    document.getElementById('btnDeletePost').addEventListener('click', () => deletePost(post.id));
+  if (isOwner || isStaff) {
+    const actionsWrap = document.getElementById('postOwnerActions');
+    actionsWrap.style.display = 'flex';
+    const staffActingOnOthers = isStaff && !isOwner;
+    actionsWrap.innerHTML = `
+      <button class="btn-ghost" id="btnEditPost">Edit</button>
+      <button class="btn-ghost" id="btnDeletePost">Delete</button>
+      ${staffActingOnOthers ? `<button class="btn-ghost" id="btnWarnUser">Warn User</button>` : ''}
+    `;
+    document.getElementById('btnEditPost').addEventListener('click', () => editPost(post, c, staffActingOnOthers));
+    document.getElementById('btnDeletePost').addEventListener('click', () => deletePost(post, staffActingOnOthers));
+    if (staffActingOnOthers) {
+      document.getElementById('btnWarnUser').addEventListener('click', () => warnUser(post));
+    }
   }
 }
 
-async function editPost(post, parsedContent) {
+async function editPost(post, parsedContent, staffActingOnOthers) {
   const newTitle = prompt('Edit title:', post.title);
   if (newTitle === null) return;
   const trimmedTitle = newTitle.trim();
@@ -320,16 +426,79 @@ async function editPost(post, parsedContent) {
     updatePayload.content = JSON.stringify(rebuilt);
   }
 
+  let reason = '';
+  if (staffActingOnOthers) {
+    const reasonInput = prompt('This is not your post. Enter a reason for this edit (required):', '');
+    if (reasonInput === null) return;
+    reason = reasonInput.trim();
+    if (!reason) { alert('A reason is required to edit someone else\u2019s post.'); return; }
+    if (!confirm(`Edit "${post.title}" by ${post.profiles?.display_name || 'this user'}?\n\nReason: ${reason}\n\nConfirm this edit?`)) return;
+  }
+
   const { error } = await sb.from('posts').update(updatePayload).eq('id', post.id);
   if (error) { alert('Failed to update: ' + error.message); return; }
+
+  if (staffActingOnOthers) {
+    sendNotification({
+      userId: post.author_id, type: 'post_edited', postId: post.id,
+      postTitle: trimmedTitle, reason,
+    });
+  }
   window.location.reload();
 }
 
-async function deletePost(id) {
-  if (!confirm('Delete this post? This cannot be undone.')) return;
-  const { error } = await sb.from('posts').delete().eq('id', id);
+async function deletePost(post, staffActingOnOthers) {
+  let reason = '';
+  if (staffActingOnOthers) {
+    const reasonInput = prompt('This is not your post. Enter a reason for this deletion (required):', '');
+    if (reasonInput === null) return;
+    reason = reasonInput.trim();
+    if (!reason) { alert('A reason is required to delete someone else\u2019s post.'); return; }
+    if (!confirm(`Delete "${post.title}" by ${post.profiles?.display_name || 'this user'}? This cannot be undone.\n\nReason: ${reason}\n\nConfirm this deletion?`)) return;
+  } else {
+    if (!confirm('Delete this post? This cannot be undone.')) return;
+  }
+
+  if (staffActingOnOthers) {
+    /* Send the notification BEFORE deleting — post_id uses ON DELETE SET
+       NULL so the notification survives, and post_title is snapshotted
+       here in case post_id later goes null. */
+    await sendNotification({
+      userId: post.author_id, type: 'post_deleted', postId: post.id,
+      postTitle: post.title, reason,
+    });
+  }
+
+  const { error } = await sb.from('posts').delete().eq('id', post.id);
   if (error) { alert('Failed to delete: ' + error.message); return; }
   window.location.href = '../index.html';
+}
+
+async function warnUser(post) {
+  const targetName = post.profiles?.display_name || 'this user';
+  const messageInput = prompt(`Warn ${targetName}. Enter the warning message (required):`, '');
+  if (messageInput === null) return;
+  const message = messageInput.trim();
+  if (!message) { alert('A warning message is required.'); return; }
+  if (!confirm(`Send this warning to ${targetName}?\n\n"${message}"`)) return;
+
+  await sendNotification({
+    userId: post.author_id, type: 'warned', postId: post.id,
+    postTitle: post.title, reason: message,
+  });
+  alert('Warning sent.');
+}
+
+async function fetchCommentReactionData(commentIds) {
+  const counts = {}, mine = {};
+  commentIds.forEach(id => { counts[id] = { like: 0, dislike: 0 }; });
+  if (!commentIds.length) return { counts, mine };
+  const { data } = await sb.from('comment_reactions').select('comment_id,user_id,type').in('comment_id', commentIds);
+  (data || []).forEach(r => {
+    if (counts[r.comment_id]) counts[r.comment_id][r.type]++;
+    if (me && r.user_id === me.id) mine[r.comment_id] = r.type;
+  });
+  return { counts, mine };
 }
 
 async function loadComments() {
@@ -356,11 +525,27 @@ async function loadComments() {
     return;
   }
 
-  listEl.innerHTML = data.map(c => {
+  const { counts: reactionCounts, mine: myReactions } = await fetchCommentReactionData(data.map(c => c.id));
+
+  const byId = {};
+  data.forEach(c => { byId[c.id] = { ...c, children: [] }; });
+  const roots = [];
+  data.forEach(c => {
+    if (c.parent_id && byId[c.parent_id]) {
+      byId[c.parent_id].children.push(byId[c.id]);
+    } else {
+      roots.push(byId[c.id]);
+    }
+  });
+
+  function renderNode(c, depth) {
     const isOwner = me && c.author_id === me.id;
     const isStaff = myProfile && (myProfile.role === 'admin' || myProfile.role === 'developer');
+    const cCounts = reactionCounts[c.id] || { like: 0, dislike: 0 };
+    const myR = myReactions[c.id];
+    const indent = Math.min(depth, 4) * 26;
     return `
-    <div class="comment-item">
+    <div class="comment-item" style="margin-left:${indent}px;">
       ${avatarHtml(c.profiles, 34)}
       <div class="comment-body">
         <div class="comment-head">
@@ -368,11 +553,70 @@ async function loadComments() {
           <span class="comment-date">${formatDate(c.created_at)}</span>
         </div>
         <div class="comment-text">${escapeHtml(c.content)}</div>
-        ${(isOwner || isStaff) ? `<button class="comment-del" data-id="${c.id}">Delete</button>` : ''}
+        <div class="comment-actions">
+          <button class="comment-action-btn${myR === 'like' ? ' active-like' : ''}" data-c-reaction="like" data-c-id="${c.id}">\u{1F44D} ${cCounts.like}</button>
+          <button class="comment-action-btn${myR === 'dislike' ? ' active-dislike' : ''}" data-c-reaction="dislike" data-c-id="${c.id}">\u{1F44E} ${cCounts.dislike}</button>
+          <button class="comment-action-btn" data-c-reply="${c.id}">Reply</button>
+          ${(isOwner || isStaff) ? `<button class="comment-action-btn comment-del" data-id="${c.id}">Delete</button>` : ''}
+        </div>
+        <div class="reply-form-wrap" id="replyForm-${c.id}" style="display:none; margin-top:10px;">
+          <textarea id="replyText-${c.id}" placeholder="Write a reply..." style="min-height:60px;"></textarea>
+          <div style="margin-top:6px; display:flex; gap:8px;">
+            <button class="btn" style="width:auto; padding:7px 16px; margin-top:0;" data-c-submit-reply="${c.id}">Reply</button>
+            <button class="btn-ghost" data-c-cancel-reply="${c.id}">Cancel</button>
+          </div>
+        </div>
+        ${(c.children && c.children.length) ? c.children.map(child => renderNode(child, depth + 1)).join('') : ''}
       </div>
     </div>
-  `;
-  }).join('');
+    `;
+  }
+
+  listEl.innerHTML = roots.map(c => renderNode(c, 0)).join('');
+
+  listEl.querySelectorAll('[data-c-reaction]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!me) { alert('Log in to like or dislike comments.'); return; }
+      btn.disabled = true;
+      await toggleCommentReaction(btn.getAttribute('data-c-id'), btn.getAttribute('data-c-reaction'));
+      loadComments();
+    });
+  });
+
+  listEl.querySelectorAll('[data-c-reply]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const form = document.getElementById(`replyForm-${btn.getAttribute('data-c-reply')}`);
+      if (form) form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    });
+  });
+
+  listEl.querySelectorAll('[data-c-cancel-reply]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const form = document.getElementById(`replyForm-${btn.getAttribute('data-c-cancel-reply')}`);
+      if (form) form.style.display = 'none';
+    });
+  });
+
+  listEl.querySelectorAll('[data-c-submit-reply]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!me) { alert('Log in to reply.'); return; }
+      const parentId = btn.getAttribute('data-c-submit-reply');
+      const textarea = document.getElementById(`replyText-${parentId}`);
+      const content = textarea.value.trim();
+      if (!content) return;
+      btn.disabled = true;
+
+      const { data: parentComment } = await sb.from('comments').select('author_id').eq('id', parentId).maybeSingle();
+      const { error } = await sb.from('comments').insert({ post_id: POST_ID, author_id: me.id, content, parent_id: parentId });
+      btn.disabled = false;
+      if (error) { alert('Failed to post reply: ' + error.message); return; }
+
+      if (parentComment) {
+        sendNotification({ userId: parentComment.author_id, type: 'comment_reply', postId: POST_ID, postTitle: currentPost.title, commentId: parentId });
+      }
+      loadComments();
+    });
+  });
 
   listEl.querySelectorAll('.comment-del').forEach(btn => {
     btn.addEventListener('click', async () => {
@@ -382,6 +626,25 @@ async function loadComments() {
       loadComments();
     });
   });
+}
+
+async function toggleCommentReaction(commentId, type) {
+  const { data: existing } = await sb.from('comment_reactions').select('id,type').eq('comment_id', commentId).eq('user_id', me.id).maybeSingle();
+  const { data: c } = await sb.from('comments').select('author_id').eq('id', commentId).maybeSingle();
+  const commentAuthorId = c ? c.author_id : null;
+
+  if (existing && existing.type === type) {
+    await sb.from('comment_reactions').delete().eq('id', existing.id);
+    return;
+  }
+  if (existing) {
+    await sb.from('comment_reactions').update({ type }).eq('id', existing.id);
+  } else {
+    await sb.from('comment_reactions').insert({ comment_id: commentId, user_id: me.id, type });
+  }
+  if (commentAuthorId) {
+    sendNotification({ userId: commentAuthorId, type: type === 'like' ? 'comment_like' : 'comment_dislike', postId: POST_ID, postTitle: currentPost.title, commentId });
+  }
 }
 
 document.getElementById('btnPostComment')?.addEventListener('click', async () => {
@@ -406,6 +669,7 @@ document.getElementById('btnPostComment')?.addEventListener('click', async () =>
   }
   msg.className = ''; msg.textContent = '';
   textarea.value = '';
+  sendNotification({ userId: currentPost.author_id, type: 'post_comment', postId: POST_ID, postTitle: currentPost.title });
   loadComments();
 });
 

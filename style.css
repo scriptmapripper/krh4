@@ -304,6 +304,9 @@ ul.tree ul.tree{margin-left:16px; border-left:1px dashed var(--border-strong); p
   color:var(--text-1); cursor:pointer; text-decoration:none; transition:.15s ease;
 }
 .gallery-btn:hover{ color:var(--text-0); background:rgba(255,255,255,.08); }
+.reaction-btn.active-like{ color:var(--green); border-color:var(--green); background:rgba(47,208,106,.12); }
+.reaction-btn.active-dislike{ color:var(--red); border-color:var(--red); background:rgba(240,69,69,.12); }
+.reaction-btn.active-save{ color:var(--orange); border-color:var(--orange); background:rgba(245,165,36,.12); }
 
 .file-gallery{ display:flex; flex-direction:column; gap:12px; }
 .file-card{

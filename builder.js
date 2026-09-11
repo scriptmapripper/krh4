@@ -64,6 +64,100 @@ function wireCardNavigation(container){
   });
 }
 
+/* Batch-fetches like/dislike counts, the current user's own reaction, and
+   which of these posts (if any) they've saved — one query each, not one
+   per card, to avoid hammering Supabase with N+1 requests in a gallery. */
+async function fetchReactionData(postIds, userId){
+  const counts = {}, mine = {}, saved = {};
+  postIds.forEach(id => { counts[id] = { like: 0, dislike: 0 }; });
+  if(!postIds.length) return { counts, mine, saved };
+
+  const { data: reactions } = await sb.from('post_reactions').select('post_id,user_id,type').in('post_id', postIds);
+  (reactions || []).forEach(r => {
+    if(counts[r.post_id]) counts[r.post_id][r.type]++;
+    if(userId && r.user_id === userId) mine[r.post_id] = r.type;
+  });
+
+  if(userId){
+    const { data: saves } = await sb.from('post_saves').select('post_id').eq('user_id', userId).in('post_id', postIds);
+    (saves || []).forEach(s => { saved[s.post_id] = true; });
+  }
+
+  return { counts, mine, saved };
+}
+
+async function toggleReaction(postId, type, userId){
+  const { data: existing } = await sb.from('post_reactions').select('id,type').eq('post_id', postId).eq('user_id', userId).maybeSingle();
+  if(existing && existing.type === type){
+    await sb.from('post_reactions').delete().eq('id', existing.id);
+    return null;
+  }
+  if(existing){
+    await sb.from('post_reactions').update({ type }).eq('id', existing.id);
+    return type;
+  }
+  await sb.from('post_reactions').insert({ post_id: postId, user_id: userId, type });
+  return type;
+}
+
+async function toggleSave(postId, userId){
+  const { data: existing } = await sb.from('post_saves').select('id').eq('post_id', postId).eq('user_id', userId).maybeSingle();
+  if(existing){
+    await sb.from('post_saves').delete().eq('id', existing.id);
+    return false;
+  }
+  await sb.from('post_saves').insert({ post_id: postId, user_id: userId });
+  return true;
+}
+
+function reactionButtonsHtml(postId, counts, myReaction, isSaved){
+  const c = counts || { like: 0, dislike: 0 };
+  return `
+    <button class="gallery-btn reaction-btn${myReaction === 'like' ? ' active-like' : ''}" data-reaction="like" data-post-react="${postId}">\u{1F44D} ${c.like}</button>
+    <button class="gallery-btn reaction-btn${myReaction === 'dislike' ? ' active-dislike' : ''}" data-reaction="dislike" data-post-react="${postId}">\u{1F44E} ${c.dislike}</button>
+    <button class="gallery-btn reaction-btn${isSaved ? ' active-save' : ''}" data-save-post="${postId}">${isSaved ? '\u2605' : '\u2606'} ${isSaved ? 'Saved' : 'Save'}</button>
+  `;
+}
+
+/* Wires up reaction/save buttons rendered by reactionButtonsHtml. `reload`
+   is called after a successful toggle so the caller can refresh counts. */
+function wireReactionButtons(container, currentUser, reload){
+  if(!container) return;
+
+  container.querySelectorAll('[data-reaction]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if(!currentUser){ alert('Log in to like or dislike posts.'); return; }
+      btn.disabled = true;
+      const postId = btn.getAttribute('data-post-react');
+      const type = btn.getAttribute('data-reaction');
+      try {
+        await toggleReaction(postId, type, currentUser.id);
+        reload();
+      } catch(err){
+        alert('Something went wrong: ' + err.message);
+        btn.disabled = false;
+      }
+    });
+  });
+
+  container.querySelectorAll('[data-save-post]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if(!currentUser){ alert('Log in to save posts.'); return; }
+      btn.disabled = true;
+      const postId = btn.getAttribute('data-save-post');
+      try {
+        await toggleSave(postId, currentUser.id);
+        reload();
+      } catch(err){
+        alert('Something went wrong: ' + err.message);
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
 /* ---------------- data model (from mindmap) ---------------- */
 const DATA = [
   { id:'home', label:'Home', color:'blue', glyph:'home',
@@ -1177,6 +1271,8 @@ async function loadCrosshairGallery(cat){
     if(!data.length){ container.innerHTML = `<div class="gallery-empty">Nothing posted here yet. Be the first!</div>`; return; }
     if(document.getElementById('crosshairGallery') !== container) return; /* navigated away */
 
+    const { counts: reactionCounts, mine: myReactions, saved: mySaves } = await fetchReactionData(data.map(p => p.id), currentUser?.id);
+
     container.innerHTML = data.map((p, i) => {
       let parsed = null;
       try { parsed = JSON.parse(p.content); } catch(e) { /* legacy plain URL or crosshair code */ }
@@ -1193,6 +1289,7 @@ async function loadCrosshairGallery(cat){
         <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
         ${parsed ? `<div class="gallery-desc" id="ch-desc-${p.id}" style="display:none;">${description ? escapeHtml(description) : 'No description provided.'}</div>` : ''}
         <div class="gallery-actions">
+          ${reactionButtonsHtml(p.id, reactionCounts[p.id], myReactions[p.id], mySaves[p.id])}
           ${parsed ? `<button class="gallery-btn" data-action="toggle-desc" data-id="${p.id}">Description</button>` : ''}
           ${isImage
             ? `<button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(imageUrl)}" data-filename="${encodeURIComponent((p.title || 'crosshair').replace(/[^a-z0-9-_]+/gi, '_').toLowerCase() + '.png')}">Download PNG</button>`
@@ -1206,6 +1303,7 @@ async function loadCrosshairGallery(cat){
     `;
     }).join('');
     wireCardNavigation(container);
+    wireReactionButtons(container, currentUser, () => loadCrosshairGallery(cat));
 
     data.forEach((p, i) => {
       let parsed = null;
@@ -1318,6 +1416,8 @@ async function loadFileGallery(cat){
     if(!data.length){ container.innerHTML = `<div class="gallery-empty">Nothing posted here yet. Be the first!</div>`; return; }
     if(document.getElementById('fileGallery') !== container) return; /* navigated away */
 
+    const { counts: reactionCounts, mine: myReactions, saved: mySaves } = await fetchReactionData(data.map(p => p.id), currentUser?.id);
+
     container.innerHTML = data.map(p => {
       const isOwner = currentUser && p.author_id === currentUser.id;
       let files = [{ file_url: p.content, file_name: '' }];
@@ -1357,6 +1457,7 @@ async function loadFileGallery(cat){
           ${isJsonContent ? `<div class="gallery-desc" id="desc-${p.id}" style="display:none;">${description ? escapeHtml(description) : 'No description provided.'}</div>` : ''}
         </div>
         <div class="gallery-actions">
+          ${reactionButtonsHtml(p.id, reactionCounts[p.id], myReactions[p.id], mySaves[p.id])}
           ${isJsonContent ? `<button class="gallery-btn" data-action="toggle-desc" data-id="${p.id}">Description</button>` : ''}
           ${downloadButtonsHtml}
           ${isOwner ? `
@@ -1368,6 +1469,7 @@ async function loadFileGallery(cat){
     `;
     }).join('');
     wireCardNavigation(container);
+    wireReactionButtons(container, currentUser, () => loadFileGallery(cat));
 
     container.querySelectorAll('[data-action="download-remote"]').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -1454,6 +1556,8 @@ async function loadCssGallery(){
     if(!data.length){ container.innerHTML = `<div class="gallery-empty">Nothing posted here yet. Be the first!</div>`; return; }
     if(document.getElementById('cssGallery') !== container) return; /* navigated away */
 
+    const { counts: reactionCounts, mine: myReactions, saved: mySaves } = await fetchReactionData(data.map(p => p.id), currentUser?.id);
+
     container.innerHTML = data.map(p => {
       let parsed = null;
       try { parsed = JSON.parse(p.content); } catch(e) { /* legacy/plain content */ }
@@ -1475,6 +1579,7 @@ async function loadCssGallery(){
         <div class="gallery-meta">by ${escapeHtml(p.profiles?.display_name || '?')} · ${formatDate(p.created_at)}</div>
         ${parsed ? `<div class="gallery-desc" id="css-desc-${p.id}" style="display:none;">${description ? escapeHtml(description) : 'No description provided.'}</div>` : ''}
         <div class="gallery-actions">
+          ${reactionButtonsHtml(p.id, reactionCounts[p.id], myReactions[p.id], mySaves[p.id])}
           ${parsed ? `<button class="gallery-btn" data-action="toggle-desc" data-id="${p.id}">Description</button>` : ''}
           ${fileUrl ? `<button class="gallery-btn" data-action="download-remote" data-url="${encodeURIComponent(fileUrl)}" data-filename="${encodeURIComponent(fileName)}">Download</button>` : ''}
           ${isOwner ? `
@@ -1486,6 +1591,7 @@ async function loadCssGallery(){
     `;
     }).join('');
     wireCardNavigation(container);
+    wireReactionButtons(container, currentUser, () => loadCssGallery());
 
     container.querySelectorAll('[data-action="download-remote"]').forEach(btn => {
       btn.addEventListener('click', () => {

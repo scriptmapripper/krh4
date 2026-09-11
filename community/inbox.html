@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inbox — Krunker Resource Hub</title>
+<link rel="stylesheet" href="community.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  .inbox-list{ display:flex; flex-direction:column; gap:8px; }
+  .inbox-row{
+    display:flex; gap:12px; align-items:flex-start; padding:14px 16px; border-radius:12px;
+    border:1px solid var(--border); background:var(--surface-2); text-decoration:none; cursor:pointer;
+    transition:.15s ease;
+  }
+  .inbox-row:hover{ border-color:var(--border-strong); }
+  .inbox-row.unread{ background:rgba(96,165,250,.07); border-color:rgba(96,165,250,.35); }
+  .inbox-icon{ font-size:20px; flex:none; width:26px; text-align:center; margin-top:2px; }
+  .inbox-body{ flex:1; min-width:0; }
+  .inbox-text{ font-size:13.5px; color:var(--text-1); line-height:1.5; }
+  .inbox-text b{ color:var(--text-0); }
+  .inbox-reason{
+    margin-top:6px; font-size:12.5px; color:var(--text-2); background:rgba(255,255,255,.03);
+    border-left:2px solid var(--border-strong); padding:6px 10px; border-radius:0 6px 6px 0;
+  }
+  .inbox-date{ font-size:11.5px; color:var(--text-2); margin-top:6px; }
+  .inbox-actions{ display:flex; flex-direction:column; gap:6px; flex:none; }
+  .inbox-del{
+    background:none; border:none; color:var(--text-2); font-size:12px; cursor:pointer;
+  }
+  .inbox-del:hover{ color:#ff8b8b; }
+  .inbox-toolbar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand"><a href="../index.html">◂ Krunker Resource Hub</a></div>
+    <div class="topnav" id="topnav"></div>
+  </div>
+
+  <div class="card">
+    <div class="inbox-toolbar">
+      <h2 style="margin:0;">Inbox</h2>
+      <button class="btn-ghost" id="btnMarkAllRead">Mark all as read</button>
+    </div>
+    <div class="inbox-list" id="inboxList"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
+<script src="supabase-client.js"></script>
+<script>
+const TYPE_ICON = {
+  post_like: '\u{1F44D}', post_dislike: '\u{1F44E}', post_comment: '\u{1F4AC}',
+  comment_reply: '\u21A9\uFE0F', comment_like: '\u{1F44D}', comment_dislike: '\u{1F44E}',
+  post_edited: '\u270F\uFE0F', post_deleted: '\u{1F5D1}\uFE0F', warned: '\u26A0\uFE0F',
+};
+
+let me = null;
+
+function describe(n) {
+  const actor = n.actor?.display_name || 'Someone';
+  const title = n.post_title ? `"${n.post_title}"` : 'your post';
+  switch (n.type) {
+    case 'post_like': return `<b>${escapeHtml(actor)}</b> liked your post ${escapeHtml(title)}`;
+    case 'post_dislike': return `<b>${escapeHtml(actor)}</b> disliked your post ${escapeHtml(title)}`;
+    case 'post_comment': return `<b>${escapeHtml(actor)}</b> commented on your post ${escapeHtml(title)}`;
+    case 'comment_reply': return `<b>${escapeHtml(actor)}</b> replied to your comment on ${escapeHtml(title)}`;
+    case 'comment_like': return `<b>${escapeHtml(actor)}</b> liked your comment on ${escapeHtml(title)}`;
+    case 'comment_dislike': return `<b>${escapeHtml(actor)}</b> disliked your comment on ${escapeHtml(title)}`;
+    case 'post_edited': return `<b>${escapeHtml(actor)}</b> (staff) edited your post ${escapeHtml(title)}`;
+    case 'post_deleted': return `<b>${escapeHtml(actor)}</b> (staff) deleted your post ${escapeHtml(title)}`;
+    case 'warned': return `<b>${escapeHtml(actor)}</b> (staff) issued you a warning${n.post_title ? ` regarding ${escapeHtml(title)}` : ''}`;
+    default: return 'New notification';
+  }
+}
+
+async function boot() {
+  me = await requireLogin("login.html");
+  const profile = await getMyProfile();
+  if (!profile) { window.location.href = "login.html"; return; }
+
+  const nav = document.getElementById("topnav");
+  let links = ``;
+  if (profile.role === "admin" || profile.role === "developer") {
+    links += `<a href="admin.html">Admin Panel</a>`;
+  }
+  if (profile.role === "developer") {
+    links += `<a href="developer.html">Developer Panel</a>`;
+  }
+  links += `<a href="saved.html" style="margin-left:6px;">Saved</a>`;
+  links += `<a href="dashboard.html" style="margin-left:6px;">Dashboard</a>`;
+  nav.innerHTML = links;
+
+  document.getElementById('btnMarkAllRead').addEventListener('click', markAllRead);
+
+  loadInbox();
+}
+
+async function loadInbox() {
+  const listEl = document.getElementById('inboxList');
+
+  const { data, error } = await sb
+    .from('notifications')
+    .select('*, actor:profiles!notifications_actor_id_fkey(username,display_name,avatar_url)')
+    .eq('user_id', me.id)
+    .order('created_at', { ascending: false })
+    .limit(100);
+
+  if (error) {
+    listEl.innerHTML = `<div class="empty">Failed to load your inbox.</div>`;
+    return;
+  }
+  if (!data.length) {
+    listEl.innerHTML = `<div class="empty">Nothing here yet — likes, replies, and staff notices will show up here.</div>`;
+    return;
+  }
+
+  listEl.innerHTML = data.map(n => `
+    <div class="inbox-row${n.read ? '' : ' unread'}" data-id="${n.id}" data-post-id="${n.post_id || ''}">
+      <div class="inbox-icon">${TYPE_ICON[n.type] || '\u{1F514}'}</div>
+      <div class="inbox-body">
+        <div class="inbox-text">${describe(n)}</div>
+        ${n.reason ? `<div class="inbox-reason">${escapeHtml(n.reason)}</div>` : ''}
+        <div class="inbox-date">${formatDate(n.created_at)}</div>
+      </div>
+      <div class="inbox-actions">
+        <button class="inbox-del" data-del-id="${n.id}">Remove</button>
+      </div>
+    </div>
+  `).join('');
+
+  listEl.querySelectorAll('.inbox-row').forEach(row => {
+    row.addEventListener('click', async (e) => {
+      if (e.target.closest('button')) return;
+      const id = row.getAttribute('data-id');
+      const postId = row.getAttribute('data-post-id');
+      await sb.from('notifications').update({ read: true }).eq('id', id);
+      if (postId) {
+        window.location.href = `post.html?id=${encodeURIComponent(postId)}`;
+      } else {
+        row.classList.remove('unread');
+      }
+    });
+  });
+
+  listEl.querySelectorAll('[data-del-id]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const { error } = await sb.from('notifications').delete().eq('id', btn.getAttribute('data-del-id'));
+      if (error) { alert('Failed to remove: ' + error.message); return; }
+      loadInbox();
+    });
+  });
+}
+
+async function markAllRead() {
+  await sb.from('notifications').update({ read: true }).eq('user_id', me.id).eq('read', false);
+  loadInbox();
+}
+
+boot();
+</script>
+</body>
+</html>
