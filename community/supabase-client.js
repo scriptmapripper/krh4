@@ -24,6 +24,19 @@ async function getMyProfile() {
     .eq("id", user.id)
     .maybeSingle();
   if (error) { console.error(error); return null; }
+
+  if (data && data.banned) {
+    const reason = data.ban_reason || "";
+    await sb.auth.signOut();
+    const inCommunityFolder = window.location.pathname.includes("/community/");
+    const alreadyOnBannedPage = window.location.pathname.endsWith("/banned.html");
+    if (!alreadyOnBannedPage) {
+      const target = (inCommunityFolder ? "banned.html" : "community/banned.html") + (reason ? `?reason=${encodeURIComponent(reason)}` : "");
+      window.location.href = target;
+    }
+    return null;
+  }
+
   return data;
 }
 
@@ -42,6 +55,24 @@ async function requireRole(allowed, redirectTo = "../index.html") {
     return null;
   }
   return profile;
+}
+
+// Returns the number of unread notifications for the given user id (0 on error)
+async function getUnreadNotificationCount(userId) {
+  if (!userId) return 0;
+  const { count, error } = await sb
+    .from("notifications")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .eq("read", false);
+  if (error) { console.error(error); return 0; }
+  return count || 0;
+}
+
+// Returns an inline unread-count badge as an HTML string, or "" if count is 0
+function unreadBadgeHtml(count) {
+  if (!count) return "";
+  return `<span style="display:inline-flex; align-items:center; justify-content:center; min-width:16px; height:16px; padding:0 4px; border-radius:20px; background:var(--blue-glow); color:#05070f; font-size:10px; font-weight:700; margin-left:4px; vertical-align:middle;">${count > 99 ? "99+" : count}</span>`;
 }
 
 function roleBadge(role) {

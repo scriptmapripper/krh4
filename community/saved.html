@@ -73,7 +73,8 @@ async function boot() {
   if (profile.role === "developer") {
     links += `<a href="developer.html">Developer Panel</a>`;
   }
-  links += `<a href="inbox.html" style="margin-left:6px;">Inbox</a>`;
+  const unreadCount = await getUnreadNotificationCount(me.id);
+  links += `<a href="inbox.html" style="margin-left:6px;">Inbox${unreadBadgeHtml(unreadCount)}</a>`;
   links += `<a href="dashboard.html" style="margin-left:6px;">Dashboard</a>`;
   nav.innerHTML = links;
 

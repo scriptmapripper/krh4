@@ -41,6 +41,10 @@
     <label>Krunker Username</label>
     <input type="text" id="fKrunker" placeholder="Your Krunker username (optional)">
 
+    <label>Bio</label>
+    <textarea id="fBio" placeholder="Tell people a bit about yourself (optional)" maxlength="200" style="min-height:90px;"></textarea>
+    <p class="hint" id="bioCounter" style="margin-top:-8px;">0 / 200</p>
+
     <button class="btn" id="btnSaveProfile">Save Changes</button>
     <div class="msg" id="profileMsg"></div>
   </div>
@@ -109,6 +113,7 @@
   <div class="card">
     <h2>Account Info</h2>
     <p class="hint" id="accountInfo" style="margin-top:0;"></p>
+    <a href="#" id="viewProfileLink" class="btn ghost" style="display:inline-flex; width:auto; padding:9px 18px; text-decoration:none; margin-top:10px;">View My Public Profile</a>
   </div>
 
   <div class="card">
@@ -141,6 +146,8 @@ async function boot() {
   document.getElementById("fName").value = myProfile.display_name || "";
   document.getElementById("fUsername").value = myProfile.username || "";
   document.getElementById("fKrunker").value = myProfile.krunker_username || "";
+  document.getElementById("fBio").value = myProfile.bio || "";
+  document.getElementById("bioCounter").textContent = `${(myProfile.bio || "").length} / 200`;
   document.getElementById("fBirthdate").value = myProfile.birthdate || "";
   document.getElementById("fGender").value = myProfile.gender || "prefer_not_to_say";
   document.getElementById("fCurrentEmailDisplay").value = me.email || "";
@@ -148,6 +155,7 @@ async function boot() {
   document.getElementById("accountInfo").innerHTML =
     `Joined: ${formatDate(myProfile.created_at)}` +
     (myProfile.discord_username ? `<br>Discord: ${escapeHtml(myProfile.discord_username)}` : "");
+  document.getElementById("viewProfileLink").href = `profile.html?user=${encodeURIComponent(myProfile.username)}`;
 }
 
 function renderAvatarPreview() {
@@ -155,6 +163,10 @@ function renderAvatarPreview() {
     avatarHtml(myProfile, 72) +
     `<span class="hint" style="margin-top:0;">Current profile picture</span>`;
 }
+
+document.getElementById("fBio").addEventListener("input", (e) => {
+  document.getElementById("bioCounter").textContent = `${e.target.value.length} / 200`;
+});
 
 // ---------- Avatar upload ----------
 document.getElementById("btnAvatarUpload").addEventListener("click", async () => {
@@ -210,6 +222,7 @@ document.getElementById("btnSaveProfile").addEventListener("click", async () => 
   const display_name = document.getElementById("fName").value.trim();
   const username = document.getElementById("fUsername").value.trim();
   const krunker_username = document.getElementById("fKrunker").value.trim();
+  const bio = document.getElementById("fBio").value.trim();
 
   if (!display_name || !username) {
     msg.className = "msg error show"; msg.textContent = "Full name & username are required.";
@@ -220,7 +233,7 @@ document.getElementById("btnSaveProfile").addEventListener("click", async () => 
   btn.disabled = true; btn.textContent = "Saving...";
 
   const { error } = await sb.from("profiles").update({
-    display_name, username, krunker_username: krunker_username || null,
+    display_name, username, krunker_username: krunker_username || null, bio: bio || null,
   }).eq("id", me.id);
 
   btn.disabled = false; btn.textContent = "Save Changes";
@@ -231,6 +244,7 @@ document.getElementById("btnSaveProfile").addEventListener("click", async () => 
   }
   myProfile.display_name = display_name;
   myProfile.username = username;
+  myProfile.bio = bio;
   msg.className = "msg ok show"; msg.textContent = "Profile updated!";
 });
 

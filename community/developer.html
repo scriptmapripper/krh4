@@ -75,14 +75,19 @@ function render() {
       <div class="title">${escapeHtml(u.display_name)} <span style="color:var(--text-2); font-weight:500;">@${escapeHtml(u.username)}</span></div>
       <div class="meta">
         ${roleBadge(u.role)}
+        ${u.banned ? `<span class="role-badge" style="background:rgba(240,69,69,.15); color:var(--red);">Banned</span>` : ''}
         ${u.discord_username ? `<span>Discord: ${escapeHtml(u.discord_username)}</span>` : ""}
         ${u.krunker_username ? `<span>Krunker: ${escapeHtml(u.krunker_username)}</span>` : ""}
         <span>Joined ${formatDate(u.created_at)}</span>
       </div>
+      ${u.banned && u.ban_reason ? `<div class="hint" style="margin-top:4px;">Ban reason: ${escapeHtml(u.ban_reason)}</div>` : ''}
       <div class="post-actions">
         ${u.role === 'developer' ? `<span class="hint">Developer role can only be changed via SQL.</span>` : ""}
         ${u.role === 'user' ? `<button class="btn small green" onclick="setRole('${u.id}','admin')">Make Admin</button>` : ""}
         ${u.role === 'admin' ? `<button class="btn small danger" onclick="setRole('${u.id}','user')">Revoke Admin</button>` : ""}
+        ${u.role !== 'developer' ? (u.banned
+          ? `<button class="btn small green" onclick="unbanUser('${u.id}')">Unban</button>`
+          : `<button class="btn small danger" onclick="banUser('${u.id}')">Ban</button>`) : ""}
       </div>
     </div>
   `).join("");
@@ -91,6 +96,44 @@ function render() {
 async function setRole(id, role) {
   const { error } = await sb.from("profiles").update({ role }).eq("id", id);
   if (error) { alert("Failed: " + error.message); return; }
+  loadUsers();
+}
+
+async function banUser(id) {
+  const user = allUsers.find(u => u.id === id);
+  const reasonInput = prompt(`Ban ${user ? user.display_name : 'this user'}. Enter a reason (required):`, "");
+  if (reasonInput === null) return;
+  const reason = reasonInput.trim();
+  if (!reason) { alert("A reason is required to ban a user."); return; }
+  if (!confirm(`Ban ${user ? user.display_name : 'this user'}?\n\nReason: ${reason}\n\nThey will be immediately signed out and lose all access. Confirm?`)) return;
+
+  const me = await getSessionUser();
+  const { error } = await sb.from("profiles").update({
+    banned: true, ban_reason: reason, banned_at: new Date().toISOString(), banned_by: me ? me.id : null,
+  }).eq("id", id);
+  if (error) { alert("Failed: " + error.message); return; }
+
+  await sb.from("notifications").insert({
+    user_id: id, type: "banned", actor_id: me ? me.id : null, reason: reason,
+  });
+
+  loadUsers();
+}
+
+async function unbanUser(id) {
+  const user = allUsers.find(u => u.id === id);
+  if (!confirm(`Unban ${user ? user.display_name : 'this user'}? They'll regain full access immediately.`)) return;
+
+  const { error } = await sb.from("profiles").update({
+    banned: false, ban_reason: null, banned_at: null, banned_by: null,
+  }).eq("id", id);
+  if (error) { alert("Failed: " + error.message); return; }
+
+  const me = await getSessionUser();
+  await sb.from("notifications").insert({
+    user_id: id, type: "unbanned", actor_id: me ? me.id : null,
+  });
+
   loadUsers();
 }
 

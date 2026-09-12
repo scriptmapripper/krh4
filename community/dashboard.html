@@ -73,8 +73,9 @@ async function boot() {
   if (profile.role === "developer") {
     links += `<a href="developer.html">Developer Panel</a>`;
   }
-  links += `<span style="color:var(--text-1); font-size:13.5px; margin-left:4px;">Hi, ${escapeHtml(profile.display_name)} ${roleBadge(profile.role)}</span>`;
-  links += `<a href="inbox.html" style="margin-left:6px;">Inbox</a>`;
+  links += `<a href="profile.html?user=${encodeURIComponent(profile.username)}" style="color:var(--text-1); font-size:13.5px; margin-left:4px; text-decoration:none;">Hi, ${escapeHtml(profile.display_name)} ${roleBadge(profile.role)}</a>`;
+  const unreadCount = await getUnreadNotificationCount(me.id);
+  links += `<a href="inbox.html" style="margin-left:6px;">Inbox${unreadBadgeHtml(unreadCount)}</a>`;
   links += `<a href="saved.html" style="margin-left:6px;">Saved</a>`;
   links += `<a href="settings.html" style="margin-left:6px;">Settings</a>`;
   nav.innerHTML = links;

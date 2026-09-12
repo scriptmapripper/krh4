@@ -257,7 +257,8 @@ async function boot() {
   const nav = document.getElementById('topnav');
   nav.innerHTML = '';
   if (me) {
-    nav.innerHTML = `<a href="inbox.html">Inbox</a><a href="dashboard.html">Dashboard</a>`;
+    const unreadCount = await getUnreadNotificationCount(me.id);
+    nav.innerHTML = `<a href="inbox.html">Inbox${unreadBadgeHtml(unreadCount)}</a><a href="dashboard.html">Dashboard</a>`;
   } else {
     nav.innerHTML = `<a href="login.html">Login</a><a href="signup.html">Sign Up</a>`;
   }
@@ -325,8 +326,10 @@ function renderPost(post, isOwner, isStaff) {
 
   const author = post.profiles;
   document.getElementById('postByline').innerHTML = `
-    ${avatarHtml(author, 26)}
-    <span>${escapeHtml(author?.display_name || '?')}</span>
+    <a href="profile.html?user=${encodeURIComponent(author?.username || '')}" style="display:inline-flex; align-items:center; gap:9px; text-decoration:none; color:inherit;">
+      ${avatarHtml(author, 26)}
+      <span>${escapeHtml(author?.display_name || '?')}</span>
+    </a>
     <span>·</span>
     <span>${formatDate(post.created_at)}</span>
     ${post.status !== 'published' ? `<span class="status-pill status-draft">Draft</span>` : ''}
@@ -546,10 +549,10 @@ async function loadComments() {
     const indent = Math.min(depth, 4) * 26;
     return `
     <div class="comment-item" style="margin-left:${indent}px;">
-      ${avatarHtml(c.profiles, 34)}
+      <a href="profile.html?user=${encodeURIComponent(c.profiles?.username || '')}">${avatarHtml(c.profiles, 34)}</a>
       <div class="comment-body">
         <div class="comment-head">
-          <span class="comment-author">${escapeHtml(c.profiles?.display_name || '?')}</span>
+          <a class="comment-author" href="profile.html?user=${encodeURIComponent(c.profiles?.username || '')}" style="text-decoration:none;">${escapeHtml(c.profiles?.display_name || '?')}</a>
           <span class="comment-date">${formatDate(c.created_at)}</span>
         </div>
         <div class="comment-text">${escapeHtml(c.content)}</div>
