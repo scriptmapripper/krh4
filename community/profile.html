@@ -117,7 +117,7 @@ async function boot() {
 
   const nav = document.getElementById('topnav');
   nav.innerHTML = me
-    ? `<a href="inbox.html">Inbox${unreadBadgeHtml(await getUnreadNotificationCount(me.id))}</a><a href="dashboard.html">Dashboard</a>`
+    ? `<a href="inbox.html">Inbox${unreadBadgeHtml(await getUnreadNotificationCount(me.id))}</a><a href="messages.html">Messages${unreadBadgeHtml(await getUnreadMessageCount(me.id))}</a><a href="dashboard.html">Dashboard</a>`
     : `<a href="login.html">Login</a><a href="signup.html">Sign Up</a>`;
 
   if (!TARGET_USERNAME && !TARGET_ID) { showNotFound(); return; }
@@ -160,7 +160,10 @@ function renderProfile(profile) {
   if (isOwnProfile) {
     actionsEl.innerHTML = `<a href="settings.html" class="btn-unfollow" style="text-decoration:none; display:inline-flex; align-items:center;">Edit Profile</a>`;
   } else {
-    actionsEl.innerHTML = `<button class="btn-follow" id="btnFollow">Follow</button>`;
+    actionsEl.innerHTML = `
+      <button class="btn-follow" id="btnFollow">Follow</button>
+      <a href="messages.html?with=${encodeURIComponent(profile.username)}" class="btn-unfollow" style="text-decoration:none; display:inline-flex; align-items:center;">Message</a>
+    `;
     refreshFollowButton(profile.id);
   }
 }
