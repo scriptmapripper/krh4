@@ -251,14 +251,17 @@ async function handleSave() {
 }
 
 async function boot() {
-  me = await getSessionUser();
-  myProfile = me ? await getMyProfile() : null;
+  myProfile = await getMyProfile(); // null if logged out (or banned — getMyProfile handles that)
+  me = myProfile ? { id: myProfile.id } : null;
 
   const nav = document.getElementById('topnav');
   nav.innerHTML = '';
   if (me) {
-    const unreadCount = await getUnreadNotificationCount(me.id);
-    nav.innerHTML = `<a href="inbox.html">Inbox${unreadBadgeHtml(unreadCount)}</a><a href="messages.html">Messages${unreadBadgeHtml(await getUnreadMessageCount(me.id))}</a><a href="dashboard.html">Dashboard</a>`;
+    const [unreadCount, unreadMsgCount] = await Promise.all([
+      getUnreadNotificationCount(me.id),
+      getUnreadMessageCount(me.id),
+    ]);
+    nav.innerHTML = `<a href="inbox.html">Inbox${unreadBadgeHtml(unreadCount)}</a><a href="messages.html">Messages${unreadBadgeHtml(unreadMsgCount)}</a><a href="dashboard.html">Dashboard</a>`;
   } else {
     nav.innerHTML = `<a href="login.html">Login</a><a href="signup.html">Sign Up</a>`;
   }

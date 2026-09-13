@@ -94,9 +94,9 @@ function describe(n) {
 }
 
 async function boot() {
-  me = await requireLogin("login.html");
   const profile = await getMyProfile();
   if (!profile) { window.location.href = "login.html"; return; }
+  me = await getSessionUser();
 
   const nav = document.getElementById("topnav");
   let links = ``;

@@ -71,9 +71,9 @@ let activeConversationId = null;
 let pollHandle = null;
 
 async function boot() {
-  me = await requireLogin("login.html");
   const profile = await getMyProfile();
   if (!profile) { window.location.href = "login.html"; return; }
+  me = await getSessionUser();
 
   const nav = document.getElementById("topnav");
   let links = ``;
@@ -122,12 +122,28 @@ async function loadConversationList() {
   if (error) { listEl.innerHTML = '<div class="empty">Failed to load conversations.</div>'; return; }
   if (!convos.length) { listEl.innerHTML = '<div class="empty">No conversations yet.</div>'; return; }
 
-  const rows = await Promise.all(convos.map(async c => {
-    const other = c.user1.id === me.id ? c.user2 : c.user1;
-    const { data: lastMsgs } = await sb.from('messages').select('content,sender_id,created_at,read').eq('conversation_id', c.id).order('created_at', { ascending: false }).limit(1);
-    const last = lastMsgs && lastMsgs[0];
-    const { count: unread } = await sb.from('messages').select('id', { count: 'exact', head: true }).eq('conversation_id', c.id).eq('read', false).neq('sender_id', me.id);
-    return { conv: c, other: other, last: last, unread: unread || 0 };
+  // One query for every message across all these conversations, instead of
+  // 2 extra round-trips per conversation — much faster once you have more
+  // than a couple of DMs.
+  const convIds = convos.map(c => c.id);
+  const { data: allMsgs } = await sb
+    .from('messages')
+    .select('conversation_id,content,sender_id,created_at,read')
+    .in('conversation_id', convIds)
+    .order('created_at', { ascending: false });
+
+  const lastByConv = {};
+  const unreadByConv = {};
+  (allMsgs || []).forEach(m => {
+    if (!lastByConv[m.conversation_id]) lastByConv[m.conversation_id] = m; // first hit per conv = newest, thanks to the ORDER BY above
+    if (!m.read && m.sender_id !== me.id) unreadByConv[m.conversation_id] = (unreadByConv[m.conversation_id] || 0) + 1;
+  });
+
+  const rows = convos.map(c => ({
+    conv: c,
+    other: c.user1.id === me.id ? c.user2 : c.user1,
+    last: lastByConv[c.id] || null,
+    unread: unreadByConv[c.id] || 0,
   }));
 
   listEl.innerHTML = rows.map(r => {
