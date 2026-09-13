@@ -26,9 +26,10 @@
   .dm-messages{ flex:1; overflow-y:auto; padding:18px; display:flex; flex-direction:column; gap:10px; max-height:500px; }
   .dm-bubble-row{ display:flex; }
   .dm-bubble-row.mine{ justify-content:flex-end; }
+  .dm-bubble-wrap{ max-width:min(70%, 380px); min-width:0; }
   .dm-bubble{
-    max-width:70%; padding:9px 13px; border-radius:14px; font-size:13.5px; line-height:1.5;
-    white-space:pre-wrap; word-break:break-word;
+    padding:9px 13px; border-radius:14px; font-size:13.5px; line-height:1.5;
+    white-space:pre-wrap; word-break:break-word; display:inline-block; max-width:100%;
   }
   .dm-bubble-row.mine .dm-bubble{ background:var(--blue-glow); color:#05070f; border-bottom-right-radius:4px; }
   .dm-bubble-row:not(.mine) .dm-bubble{ background:var(--surface-2); color:var(--text-1); border:1px solid var(--border); border-bottom-left-radius:4px; }
@@ -217,7 +218,7 @@ async function refreshMessages() {
 
   msgsEl.innerHTML = data.length ? data.map(m => {
     const mineClass = m.sender_id === me.id ? ' mine' : '';
-    return '<div class="dm-bubble-row' + mineClass + '"><div><div class="dm-bubble">' + escapeHtml(m.content) + '</div><div class="dm-bubble-time">' + formatDate(m.created_at) + '</div></div></div>';
+    return '<div class="dm-bubble-row' + mineClass + '"><div class="dm-bubble-wrap"><div class="dm-bubble">' + escapeHtml(m.content) + '</div><div class="dm-bubble-time">' + formatDate(m.created_at) + '</div></div></div>';
   }).join('') : '<div class="empty">No messages yet — say hi!</div>';
 
   if (wasAtBottom) msgsEl.scrollTop = msgsEl.scrollHeight;

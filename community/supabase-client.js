@@ -60,32 +60,36 @@ async function requireRole(allowed, redirectTo = "../index.html") {
 // Returns the number of unread notifications for the given user id (0 on error)
 async function getUnreadNotificationCount(userId) {
   if (!userId) return 0;
-  const { count, error } = await sb
-    .from("notifications")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .eq("read", false);
-  if (error) { console.error(error); return 0; }
-  return count || 0;
+  try {
+    const { count, error } = await sb
+      .from("notifications")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("read", false);
+    if (error) { console.error(error); return 0; }
+    return count || 0;
+  } catch (e) { console.error(e); return 0; }
 }
 
 // Returns the number of unread DMs sent TO the given user id (0 on error)
 async function getUnreadMessageCount(userId) {
   if (!userId) return 0;
-  const { data: convos, error: convError } = await sb
-    .from("conversations")
-    .select("id")
-    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
-  if (convError || !convos || !convos.length) return 0;
-  const ids = convos.map(c => c.id);
-  const { count, error } = await sb
-    .from("messages")
-    .select("id", { count: "exact", head: true })
-    .in("conversation_id", ids)
-    .eq("read", false)
-    .neq("sender_id", userId);
-  if (error) { console.error(error); return 0; }
-  return count || 0;
+  try {
+    const { data: convos, error: convError } = await sb
+      .from("conversations")
+      .select("id")
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`);
+    if (convError || !convos || !convos.length) return 0;
+    const ids = convos.map(c => c.id);
+    const { count, error } = await sb
+      .from("messages")
+      .select("id", { count: "exact", head: true })
+      .in("conversation_id", ids)
+      .eq("read", false)
+      .neq("sender_id", userId);
+    if (error) { console.error(error); return 0; }
+    return count || 0;
+  } catch (e) { console.error(e); return 0; }
 }
 
 // Returns an inline unread-count badge as an HTML string, or "" if count is 0
